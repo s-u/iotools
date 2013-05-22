@@ -1,0 +1,2 @@
+useDynLib(iotools, stdin_read, mat_split, create_chunk_reader, chunk_read)
+export(readSTDIN, mstrsplit, chunk.reader, read.chunk, hmr, hpath)
