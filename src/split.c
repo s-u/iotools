@@ -1,10 +1,16 @@
 #include <Rinternals.h>
 #include <string.h>
 
-static SEXP mat_split_mem(const char *mem, size_t len, char sep, unsigned long line) {
-    unsigned int ncol = 1, nrow, np = 0, i, N;
+/* use memory mem + len bytes as input
+   splits on '\n' to form lines
+   if nsep is specified (>=0), all characters up to <nsep> are considered the row name (aka key)
+   if specified but not present in the line, it is assumed to be ""
+   everything else is split on <sep>
+   the first line defines the number of columns for the entire matrix */
+static SEXP mat_split_mem(const char *mem, size_t len, char sep, int nsep, unsigned long line) {
+    unsigned int ncol = 1, nrow, i, N;
     unsigned long lines = 1;
-    SEXP res;
+    SEXP res, rnam, zerochar = 0;
     const char *e = memchr(mem, '\n', len), *ee = mem + len, *c, *l;
     if (!e) e = ee; /* e is the end of the first line - needed to count columns */
     c = mem;
@@ -13,15 +19,35 @@ static SEXP mat_split_mem(const char *mem, size_t len, char sep, unsigned long l
     if (ee > mem && ee[-1] == '\n') lines--; /* don't count the last empty one */
     nrow = lines;
     c = mem;
+    if (nsep >= 0) { /* skip the names part */	
+	if ((c = memchr(c, nsep, e - c))) c++; else c = mem;
+    }
     while ((c = memchr(c, (unsigned char) sep, e - c))) { ncol++; c++; }
     N = ncol * nrow;
     res = PROTECT(allocMatrix(STRSXP, nrow, ncol));
-    np++;
+    if (nsep >= 0) {
+	SEXP dimn;
+	dimn = PROTECT(allocVector(VECSXP, 2));
+	SET_VECTOR_ELT(dimn, 0, (rnam = allocVector(STRSXP, nrow)));
+	SET_VECTOR_ELT(dimn, 1, R_NilValue);	
+	setAttrib(res, R_DimNamesSymbol, dimn);
+	UNPROTECT(1);
+    }
     l = mem;
     for (i = 0; i < nrow; i++) {
 	const char *le = memchr(l, '\n', ee - l);
 	int j = i;
 	if (!le) le = ee;
+	if (nsep >= 0) {
+	    c = memchr(l, nsep, le - l);
+	    if (c) {
+		SET_STRING_ELT(rnam, i, Rf_mkCharLen(l, c - l));
+		l = c + 1;
+	    } else {
+		if (!zerochar) zerochar = mkChar("");
+		SET_STRING_ELT(rnam, i, zerochar);
+	    }
+	}
 	while ((c = memchr(l, (unsigned char) sep, le - l))) {
 	    if (j >= N)
                 Rf_error("line %lu: too many columns (expected %d)", line + (unsigned long)(i + 1), ncol);
@@ -46,12 +72,15 @@ static SEXP mat_split_mem(const char *mem, size_t len, char sep, unsigned long l
     return res;
 }
 
-SEXP mat_split(SEXP s, SEXP sSep, SEXP sLine) {
+SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sLine) {
     unsigned long line = 1;
     unsigned int ncol = 1, nrow, np = 0, i, N;
-    SEXP res;
+    int nsep = -1;
+    SEXP res, rnam, zerochar = 0;
     char sep;
     const char *c;
+
+    if (TYPEOF(sNamesSep) == STRSXP && LENGTH(sNamesSep) > 0) nsep = (int) (unsigned char) *CHAR(STRING_ELT(sNamesSep, 0));
     if (TYPEOF(sLine) == REALSXP && LENGTH(sLine))
 	line = (unsigned long) asReal(sLine);
     else if (TYPEOF(sLine) == INTSXP && LENGTH(sLine))
@@ -61,7 +90,7 @@ SEXP mat_split(SEXP s, SEXP sSep, SEXP sLine) {
     sep = CHAR(STRING_ELT(sSep, 0))[0];
     if (TYPEOF(s) != STRSXP) {
 	if (TYPEOF(s) == RAWSXP)
-	    return mat_split_mem(RAW(s), LENGTH(s), sep, line);
+	    return mat_split_mem((const char*) RAW(s), LENGTH(s), sep, nsep, line);
 	s = PROTECT(coerceVector(s, STRSXP));
 	np++;
     }
@@ -75,10 +104,21 @@ SEXP mat_split(SEXP s, SEXP sSep, SEXP sLine) {
     while ((c = strchr(c, sep))) { ncol++; c++; }
     N = ncol * nrow;
     res = PROTECT(allocMatrix(STRSXP, nrow, ncol));
+    if (nsep >= 0) setAttrib(res, R_RowNamesSymbol, (rnam = allocVector(STRSXP, nrow)));
     np++;
     for (i = 0; i < nrow; i++) {
 	const char *l = CHAR(STRING_ELT(s, i));
 	int j = i;
+	if (nsep >= 0) {
+	    c = strchr(l, nsep);
+	    if (c) {
+		SET_STRING_ELT(rnam, i, Rf_mkCharLen(l, c - l));
+		l = c + 1;
+	    } else {
+		if (!zerochar) zerochar = mkChar("");
+		SET_STRING_ELT(rnam, i, zerochar);
+	    }
+	}
 	while ((c = strchr(l, sep))) {
 	    if (j >= N)
 		Rf_error("line %lu: too many columns (expected %d)", line + (unsigned long)(i + 1), ncol);

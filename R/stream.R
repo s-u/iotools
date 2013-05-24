@@ -5,8 +5,9 @@ iostream <- function(expr, sep="|", input=file("stdin"), output=file("stdout"), 
 }
 
 as.output <- function(x) UseMethod("as.output")
-as.output.default <- function(x) as.character(x)
+as.output.default <- function(x) if (is.null(names)) as.character(x) else paste(names(x), as.character(x), sep='\t')
 as.output.table <- function(x) paste(names(x), x, sep='\t')
+as.output.matrix <- function(x) { o <- apply(x, 1, paste, collapse='|'); if (!is.null(rownames(x))) o <- paste(rownames(x), o, sep='\t'); o }
 as.output.list <- function(x) paste(names(x), sapply(x, function (e) paste(as.character(e), collapse='|')), sep='\t')
 
 run.chunked <- function(FUN) {
@@ -17,7 +18,7 @@ run.chunked <- function(FUN) {
   while (TRUE) {
     chunk <- read.chunk(reader)
     if (!length(chunk)) break
-    writeLines(as.output(FUN(chunk)), output)
+    writeLines(as.output(FUN(.GlobalEnv$formatter(chunk))), output)
   }
   invisible(TRUE)
 }
