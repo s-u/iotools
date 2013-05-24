@@ -6,8 +6,8 @@
 
 #define MIN_CACHE 128
 
-SEXP ctapply(SEXP args) {
-    SEXP rho, vec, by, fun, cdi = 0, cdv = 0, tmp, acc;
+SEXP ctapply_(SEXP args) {
+    SEXP rho, vec, by, fun, mfun, cdi = 0, cdv = 0, tmp, acc;
     int i = 0, n, cdlen;
     
     args = CDR(args);
@@ -15,6 +15,7 @@ SEXP ctapply(SEXP args) {
     vec = CAR(args); args = CDR(args);
     by  = CAR(args); args = CDR(args);
     fun = CAR(args); args = CDR(args);
+    mfun= CAR(args); args = CDR(args);
     tmp = PROTECT(allocVector(VECSXP, 3));
     acc = 0;
     if (TYPEOF(by) != INTSXP && TYPEOF(by) != REALSXP && TYPEOF(by) != STRSXP)
@@ -59,8 +60,24 @@ SEXP ctapply(SEXP args) {
 	PROTECT(eres);
 	if (!acc) acc = SET_VECTOR_ELT(tmp, 2, list1(eres));
 	else acc = SET_VECTOR_ELT(tmp, 2, CONS(eres, acc));
+	{
+	    char cbuf[64];
+	    const char *name = "";
+	    if (TYPEOF(by) == STRSXP) name = CHAR(STRING_ELT(by, i0));
+	    else if (TYPEOF(by) == INTSXP) {
+		snprintf(cbuf, sizeof(cbuf), "%d", INTEGER(by)[i0]);
+		name = cbuf;
+	    } else { /* FIXME: this one is not consistent with R ... */
+		snprintf(cbuf, sizeof(cbuf), "%g", REAL(by)[i0]);
+		name = cbuf;
+	    }
+	    setAttrib(eres, R_NamesSymbol, mkString(name));
+	}
 	UNPROTECT(1); /* eres */
     }
     UNPROTECT(1); /* tmp */
-    return acc ? acc : R_NilValue;
+    if (!acc) return R_NilValue;
+    acc = eval(PROTECT(LCONS(mfun, acc)), rho);
+    UNPROTECT(1);
+    return acc;
 }
