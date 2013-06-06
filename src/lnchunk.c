@@ -103,3 +103,33 @@ SEXP chunk_read(SEXP sReader, SEXP sMaxSize) {
     /* unreachable */
     return R_NilValue;
 }
+
+/* find out the size of the last key chunk
+   this is typically used to hold back the chunk associated with the last key
+   as we can't tell if it will continue in the next chunk */
+SEXP last_key_back(SEXP sRaw, SEXP sKeySep) {
+    const char *c, *e, *ln, *key, *keye, *key0;
+    char sep;
+    if (TYPEOF(sKeySep) != STRSXP || LENGTH(sKeySep) < 1) Rf_error("Missing or invalid key separator");
+    if (TYPEOF(sRaw) != RAWSXP) Rf_error("invalid object - must be a raw vector");
+    sep = *CHAR(STRING_ELT(sKeySep, 0));
+    c = (const char*) RAW(sRaw);
+    e = c + LENGTH(sRaw);
+    ln = e - 1;
+    while (ln >= c && *ln == '\n') ln--; /* skip trailing newlines */
+    while (--ln >= c && *ln != '\n') {}
+    if (ln < c) /* no newline found */
+	return R_NilValue;
+    /* find the key */
+    key0 = key = ln + 1;
+    if (!(keye = memchr(key, (unsigned char) sep, e - key)))
+	return ScalarInteger(LENGTH(sRaw) + 1); /* no key -> nothing to hold back */
+    /* step back and look for more keys */
+    while (ln >= c) {
+	while (--ln >= c && *ln != '\n') {}
+	if (ln >= c) {
+	    const char *ckey = ln + 1;
+	    
+	}
+    }
+}
