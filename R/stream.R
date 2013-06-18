@@ -11,7 +11,8 @@ as.output.matrix <- function(x) { o <- apply(x, 1, paste, collapse='|'); if (!is
 as.output.list <- function(x) paste(names(x), sapply(x, function (e) paste(as.character(e), collapse='|')), sep='\t')
 
 run.chunked <- function(FUN) {
-  load("stream.RData", .GlobalEnv);
+  load("stream.RData", .GlobalEnv)
+  if (!is.null(.GlobalEnv$load.packages)) try(for(i in .GlobalEnv$load.packages) require(i, quietly=TRUE, character.only=TRUE), silent=TRUE)
   input <- file("stdin", "rb")
   output <- stdout()
   reader <- chunk.reader(input)

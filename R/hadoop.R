@@ -5,7 +5,7 @@ hpath <- function(path) structure(path, class="HDFSpath")
 hinput <- function(path, formatter=function(x) { y <- mstrsplit(x, '|', '\t'); if (ncol(y) == 1L) y[,1] else y })
   structure(path, class=c("hinput", "HDFSpath"), formatter=formatter)
 
-hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, formatter) {
+hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, formatter, packages=loadedNamespaces()) {
   .rn <- function(n) paste(sprintf("%04x", as.integer(runif(n, 0, 65536))), collapse='')
   if (missing(output)) output <- hpath(sprintf("/tmp/io-hmr-temp-%d-%s", Sys.getpid(), .rn(4)))
   if (missing(job.name)) job.name <- sprintf("RCloud:iotools:hmr-%s", .rn(2))
@@ -27,12 +27,13 @@ hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, for
   e$formatter <- formatter
   e$map <- map
   e$reduce <- reduce
+  e$load.packages <- packages
   f <- tempfile("hmr-stream-dir")
   dir.create(f,, TRUE, "0700")
   owd <- getwd()
   on.exit(setwd(owd))
   setwd(f)
-  save(list=ls(envir=e, all.names=TRUE), file="stream.RData")
+  save(list=ls(envir=e, all.names=TRUE), envir=e, file="stream.RData")
   map.cmd <- if (identical(map, identity)) "" else "-mapper \"R --slave --vanilla -e 'iotools:::run.map()'\""
   reduce.cmd <- if (identical(reduce, identity)) "" else "-reducer \"R --slave --vanilla -e 'iotools:::run.reduce()'\""
   system(paste(
