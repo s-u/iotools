@@ -18,8 +18,13 @@ readSTDIN(n = 10000L)
   character vector of at most length \code{n}. If it is shorter than
   \code{n} then it signifies end of input.
 }
-\author{
-Simon Urbanek
+\note{
+  This is roughly equivalent to calling \code{readLines()} on
+  \code{file("stdin", "r")} and is retained for compatibility for some
+  experimental code.
+}
+  \author{
+  Simon Urbanek
 }
 %\examples{
 %}
