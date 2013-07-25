@@ -44,6 +44,8 @@ set.user(name, gid = NA)
   Simon Urbanek
 }
 \note{
+  This function has been moved to the \code{unixtools} package!
+
   When changing users, make sure you also change the permissions for
   \code{tempdir()} \emph{before} you change the user. Otherwise R will
   not function properly as it cannot create temporary files.

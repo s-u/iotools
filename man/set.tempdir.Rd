@@ -34,6 +34,8 @@ set.tempdir(path)
   Simon Urbanek
 }
 \note{
+  This function has been moved to the \code{unixtools} package!
+  
   \code{set.tempdir} does \emph{not} check that the path is valid and/or
   writable. it is th eusere's responsibility to create teh path and then
   use \code{set.tempdir}, otherwise R may not function properly.
