@@ -32,6 +32,10 @@ hinput(path, formatter = function(x) {
     input source already contains a formatter definition}
   \item{packages}{character vector of package names to attach on the
     compute nodes}
+  \item{reducers}{optional integer specifying the number of parallel
+    jobs in the combine step. It is a hint in the sense that any number
+    greater than one implies independence of the chunks in the combine
+    step. Default is to not assume independence.}
   \item{path}{HDFS path}
 }
 \details{
@@ -40,8 +44,9 @@ hinput(path, formatter = function(x) {
   processed using the \code{formatter} function and passed to the
   \code{map} function. The result is converted using \code{as.output}
   before going back to Hadoop. The chunkwise results are combined using
-  the \code{reduce} function - the flow is the same as int he \code{map}
-  case. Then result is returned as HDFS path.
+  the \code{reduce} function - the flow is the same as in the \code{map}
+  case. Then result is returned as HDFS path. Either \code{map} or
+  \code{reduce} can be \code{identity} (the default).
 
   \code{hpath} tags a string as HDFS path. The sole purpose here is to
   distiguish local and HDFS paths.
