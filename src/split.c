@@ -23,7 +23,6 @@ static SEXP mat_split_mem(const char *mem, size_t len, char sep, int nsep, unsig
 	if ((c = memchr(c, nsep, e - c))) c++; else c = mem;
     }
     while ((c = memchr(c, (unsigned char) sep, e - c))) { ncol++; c++; }
-    if (nsep == (int) sep) ncol--; /* if both separators are the same then one column becomes the rownames */
     N = ncol * nrow;
     res = PROTECT(allocMatrix(STRSXP, nrow, ncol));
     if (nsep >= 0) {
@@ -103,6 +102,7 @@ SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sLine) {
     /* count the separators in the first line (ncol=1 on init) */
     c = CHAR(STRING_ELT(s, 0));
     while ((c = strchr(c, sep))) { ncol++; c++; }
+    if (nsep == (int) (unsigned char) sep) ncol--;
     N = ncol * nrow;
     res = PROTECT(allocMatrix(STRSXP, nrow, ncol));
     if (nsep >= 0) {
