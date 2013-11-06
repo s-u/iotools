@@ -104,7 +104,11 @@ SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sLine) {
     while ((c = strchr(c, sep))) { ncol++; c++; }
     N = ncol * nrow;
     res = PROTECT(allocMatrix(STRSXP, nrow, ncol));
-    if (nsep >= 0) setAttrib(res, R_RowNamesSymbol, (rnam = allocVector(STRSXP, nrow)));
+    if (nsep >= 0) {
+	SEXP dn;
+	setAttrib(res, R_DimNamesSymbol, (dn = allocVector(VECSXP, 2)));
+	SET_VECTOR_ELT(dn, 0, (rnam = allocVector(STRSXP, nrow)));
+    }
     np++;
     for (i = 0; i < nrow; i++) {
 	const char *l = CHAR(STRING_ELT(s, i));
