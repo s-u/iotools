@@ -7,7 +7,7 @@
 #define MIN_CACHE 128
 
 SEXP ctapply_(SEXP args) {
-    SEXP rho, vec, by, fun, mfun, cdi = 0, cdv = 0, tmp, acc;
+    SEXP rho, vec, by, fun, mfun, cdi = 0, cdv = 0, tmp, acc, tail;
     int i = 0, n, cdlen;
     
     args = CDR(args);
@@ -38,11 +38,12 @@ SEXP ctapply_(SEXP args) {
 	N = i - i0;
 	/* allocate cache for both the vector and index */
 	if (!cdi) {
-	    cdi = SET_VECTOR_ELT(tmp, 0, allocVector(TYPEOF(by), (cdlen = ((N < MIN_CACHE) ? MIN_CACHE : N))));
-	    cdv = SET_VECTOR_ELT(tmp, 1, allocVector(TYPEOF(vec), cdlen));
+	    /* we have to guarantee named > 0 since we'll be modifying it in-place */
+	    SET_NAMED(cdi = SET_VECTOR_ELT(tmp, 0, allocVector(TYPEOF(by), (cdlen = ((N < MIN_CACHE) ? MIN_CACHE : N)))), 1);
+	    SET_NAMED(cdv = SET_VECTOR_ELT(tmp, 1, allocVector(TYPEOF(vec), cdlen)), 1);
 	} else if (cdlen < N) {
-	    cdi = SET_VECTOR_ELT(tmp, 0, allocVector(TYPEOF(by), (cdlen = N)));
-	    cdv = SET_VECTOR_ELT(tmp, 1, allocVector(TYPEOF(vec), cdlen));
+	    SET_NAMED(cdi = SET_VECTOR_ELT(tmp, 0, allocVector(TYPEOF(by), (cdlen = N))), 1);
+	    SET_NAMED(cdv = SET_VECTOR_ELT(tmp, 1, allocVector(TYPEOF(vec), cdlen)), 1);
 	}
 	SETLENGTH(cdi, N);
 	SETLENGTH(cdv, N);
@@ -57,9 +58,18 @@ SEXP ctapply_(SEXP args) {
 	else if (TYPEOF(vec) == VECSXP) memcpy(VECTOR_PTR(cdv), VECTOR_PTR(vec) + i0, sizeof(SEXP) * N);
 	eres = eval(PROTECT(LCONS(fun, CONS(cdv, args))), rho);
 	UNPROTECT(1); /* eval arg */
+	/* if the result has NAMED > 1 then we have to duplicate it
+	   see ctapply(x, y, identity). It should be uncommon, though
+	   since most functions will return newly allocated objects
+
+	   FIXME: check NAMED == 1 -- may also be bad if the reference is outside,
+	   but then NAMED1 should be duplicated before modification so I think we're safe
+	*/
+	/* Rprintf("NAMED(eres)=%d\n", NAMED(eres)); */
+	if (NAMED(eres) > 1) eres = duplicate(eres);
 	PROTECT(eres);
-	if (!acc) acc = SET_VECTOR_ELT(tmp, 2, list1(eres));
-	else acc = SET_VECTOR_ELT(tmp, 2, CONS(eres, acc));
+	if (!acc) tail = acc = SET_VECTOR_ELT(tmp, 2, list1(eres));
+	else tail = SETCDR(tail, list1(eres));
 	{
 	    char cbuf[64];
 	    const char *name = "";
@@ -71,7 +81,7 @@ SEXP ctapply_(SEXP args) {
 		snprintf(cbuf, sizeof(cbuf), "%g", REAL(by)[i0]);
 		name = cbuf;
 	    }
-	    setAttrib(eres, R_NamesSymbol, mkString(name));
+	    SET_TAG(tail, install(name));
 	}
 	UNPROTECT(1); /* eres */
     }
