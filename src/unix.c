@@ -1,6 +1,7 @@
 #include <sys/types.h>
 #include <pwd.h>
 #include <unistd.h>
+#include <string.h>
 
 #include <Rinternals.h>
 

@@ -104,6 +104,7 @@ SEXP chunk_read(SEXP sReader, SEXP sMaxSize) {
     return R_NilValue;
 }
 
+#if 0 /* this is not complete ... */
 /* find out the size of the last key chunk
    this is typically used to hold back the chunk associated with the last key
    as we can't tell if it will continue in the next chunk */
@@ -133,3 +134,4 @@ SEXP last_key_back(SEXP sRaw, SEXP sKeySep) {
 	}
     }
 }
+#endif
