@@ -43,6 +43,13 @@ mstrsplit(x, sep = "|", nsep = NA, line = 1L)
 \author{
   Simon Urbanek
 }
-%\examples{
-%}
+\examples{
+  c <- c("A\tB|C|D", "A\tB|B|B", "B\tA|C|E")
+  m <- mstrsplit(gsub("\t","|",c))
+  dim(m)
+  m
+  m <- mstrsplit(c,, "\t")
+  rownames(m)
+  m
+}
 \keyword{manip}

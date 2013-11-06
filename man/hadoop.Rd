@@ -11,7 +11,7 @@
 }
 \usage{
 hmr(input, output, map = identity, reduce = identity, job.name,
-    aux, formatter, packages = loadedNamespaces())
+    aux, formatter, packages = loadedNamespaces(), reducers)
 hpath(path)
 hinput(path, formatter = function(x) {
     y <- mstrsplit(x, "|", "\t")
