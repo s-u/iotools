@@ -26,3 +26,9 @@ run.chunked <- function(FUN) {
 
 run.map <- function() run.chunked(.GlobalEnv$map)
 run.reduce <- function() run.chunked(.GlobalEnv$reduce)
+
+chunk.apply <- function(input, FUN, ..., cr.max.size=33554432) {
+  if (!inherits(inherits, "ChunkHeader"))
+    reader <- chunk.reader(input)
+  .Call(chunk_apply, reader, cr.max.size, FUN, parent.frame(), .External(pass, ...))
+}
