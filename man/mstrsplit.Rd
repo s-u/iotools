@@ -8,7 +8,7 @@
   into a character matrix according to the separators.
 }
 \usage{
-mstrsplit(x, sep = "|", nsep = NA, line = 1L)
+mstrsplit(x, sep = "|", nsep = NA, line = 1L, quiet = FALSE)
 }
 \arguments{
   \item{x}{character vector (each element is treated as a row) or a raw
@@ -18,6 +18,9 @@ mstrsplit(x, sep = "|", nsep = NA, line = 1L)
     row names are included}
   \item{line}{line number of the first line - used to identify lines in
     error reports, not used for actual processing}
+  \item{quiet}{logical, if \code{TRUE} then \code{mstrsplit} will not
+    fail on parsing errors, otherwise input not matching the format
+    (e.g. more columns in subsequent lines) will cause an error.}
 }
 \details{
   If the input is a raw vector, then it is interpreted as ASCII content
@@ -29,12 +32,17 @@ mstrsplit(x, sep = "|", nsep = NA, line = 1L)
   remaining characters are split using the \code{sep} character into
   fields (columns). The first line of the input determines the number of
   columns. \code{mstrsplit} will fail with an error if any subsequent
-  line contains more columns. Subsequent lines can contain fewer columns
-  in which case they are set to \code{NA}.
+  line contains more columns (unless \code{quiet} is \code{TRUE}).
+  Subsequent lines can contain fewer columns in which case
+  they are set to \code{NA}.
 
   The processing is geared thowards efficiency - no string re-coding is
   performed and raw input vector is processed directly, avoiding the
   creation of intermediate string representations.
+
+  Note that it is legal to use the same separator for \code{sep} and
+  \code{nsep} in which case the first field is treated as a row name and
+  subsequent fields as data columns.
 }
 \value{
   Character matrix with as many rows as they are lines in the input and

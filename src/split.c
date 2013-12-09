@@ -1,13 +1,15 @@
 #include <Rinternals.h>
 #include <string.h>
 
+#define FL_RESILIENT 1 /* do not fail, proceed even if the input has more columns */
+
 /* use memory mem + len bytes as input
    splits on '\n' to form lines
    if nsep is specified (>=0), all characters up to <nsep> are considered the row name (aka key)
    if specified but not present in the line, it is assumed to be ""
    everything else is split on <sep>
    the first line defines the number of columns for the entire matrix */
-static SEXP mat_split_mem(const char *mem, size_t len, char sep, int nsep, unsigned long line) {
+static SEXP mat_split_mem(const char *mem, size_t len, char sep, int nsep, unsigned long line, int flags) {
     unsigned int ncol = 1, nrow, i, N;
     unsigned long lines = 1;
     SEXP res, rnam, zerochar = 0;
@@ -49,22 +51,27 @@ static SEXP mat_split_mem(const char *mem, size_t len, char sep, int nsep, unsig
 	    }
 	}
 	while ((c = memchr(l, (unsigned char) sep, le - l))) {
-	    if (j >= N)
+	    if (j >= N) {
+		if (flags & FL_RESILIENT) break;
                 Rf_error("line %lu: too many columns (expected %d)", line + (unsigned long)(i + 1), ncol);
+	    }
 	    SET_STRING_ELT(res, j, Rf_mkCharLen(l, c - l));
 	    l = c + 1;
             j += nrow;
         }
 	/* add last entry */
-        if (j >= N)
-            Rf_error("line %lu: too many columns (expected %d)", l + (unsigned long)(i + 1), ncol);
-	SET_STRING_ELT(res, j, Rf_mkCharLen(l, le - l));
-        /* fill up with NAs */
-        j += nrow;
-        while (j < N) {
-            SET_STRING_ELT(res, j, R_NaString);
-            j += nrow;
-        }
+        if (j >= N) {
+	    if (!(flags & FL_RESILIENT))
+		Rf_error("line %lu: too many columns (expected %d)", l + (unsigned long)(i + 1), ncol);
+	} else {
+	    SET_STRING_ELT(res, j, Rf_mkCharLen(l, le - l));
+	    /* fill up with NAs */
+	    j += nrow;
+	    while (j < N) {
+		SET_STRING_ELT(res, j, R_NaString);
+		j += nrow;
+	    }
+	}
 	l = le + 1;
 	if (l >= ee) break; /* should never be necesary */
     }
@@ -72,9 +79,9 @@ static SEXP mat_split_mem(const char *mem, size_t len, char sep, int nsep, unsig
     return res;
 }
 
-SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sLine) {
+SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sLine, SEXP sResilient) {
     unsigned long line = 1;
-    unsigned int ncol = 1, nrow, np = 0, i, N;
+    unsigned int ncol = 1, nrow, np = 0, i, N, resilient = asInteger(sResilient);
     int nsep = -1;
     SEXP res, rnam, zerochar = 0;
     char sep;
@@ -90,7 +97,7 @@ SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sLine) {
     sep = CHAR(STRING_ELT(sSep, 0))[0];
     if (TYPEOF(s) != STRSXP) {
 	if (TYPEOF(s) == RAWSXP)
-	    return mat_split_mem((const char*) RAW(s), LENGTH(s), sep, nsep, line);
+	    return mat_split_mem((const char*) RAW(s), LENGTH(s), sep, nsep, line, resilient ? FL_RESILIENT : 0);
 	s = PROTECT(coerceVector(s, STRSXP));
 	np++;
     }
@@ -125,21 +132,26 @@ SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sLine) {
 	    }
 	}
 	while ((c = strchr(l, sep))) {
-	    if (j >= N)
+	    if (j >= N) {
+		if (resilient) break;
 		Rf_error("line %lu: too many columns (expected %d)", line + (unsigned long)(i + 1), ncol);
+	    }
 	    SET_STRING_ELT(res, j, Rf_mkCharLen(l, c - l));
 	    l = c + 1;
 	    j += nrow;
 	}
 	/* add last entry */
-	if (j >= N)
-	    Rf_error("line %lu: too many columns (expected %d)", l + (unsigned long)(i + 1), ncol);
-	SET_STRING_ELT(res, j, Rf_mkChar(l));
-	/* fill up with NAs */
-	j += nrow;
-	while (j < N) {
-	    SET_STRING_ELT(res, j, R_NaString);
+	if (j >= N) {
+	    if (!resilient)
+		Rf_error("line %lu: too many columns (expected %d)", l + (unsigned long)(i + 1), ncol);
+	} else {
+	    SET_STRING_ELT(res, j, Rf_mkChar(l));
+	    /* fill up with NAs */
 	    j += nrow;
+	    while (j < N) {
+		SET_STRING_ELT(res, j, R_NaString);
+		j += nrow;
+	    }
 	}
     }
     UNPROTECT(np);
