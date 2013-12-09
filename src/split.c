@@ -62,7 +62,7 @@ static SEXP mat_split_mem(const char *mem, size_t len, char sep, int nsep, unsig
 	/* add last entry */
         if (j >= N) {
 	    if (!(flags & FL_RESILIENT))
-		Rf_error("line %lu: too many columns (expected %d)", l + (unsigned long)(i + 1), ncol);
+		Rf_error("line %lu: too many columns (expected %d)", line + (unsigned long)(i + 1), ncol);
 	} else {
 	    SET_STRING_ELT(res, j, Rf_mkCharLen(l, le - l));
 	    /* fill up with NAs */
@@ -143,7 +143,7 @@ SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sLine, SEXP sResilient) {
 	/* add last entry */
 	if (j >= N) {
 	    if (!resilient)
-		Rf_error("line %lu: too many columns (expected %d)", l + (unsigned long)(i + 1), ncol);
+		Rf_error("line %lu: too many columns (expected %d)", line + (unsigned long)(i + 1), ncol);
 	} else {
 	    SET_STRING_ELT(res, j, Rf_mkChar(l));
 	    /* fill up with NAs */
