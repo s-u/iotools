@@ -91,7 +91,7 @@ SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sLine, SEXP sResilient) {
     if (TYPEOF(sLine) == REALSXP && LENGTH(sLine))
 	line = (unsigned long) asReal(sLine);
     else if (TYPEOF(sLine) == INTSXP && LENGTH(sLine))
-	line = (unsigned long) sLine;
+	line = (unsigned long) asInteger(sLine);
     if (TYPEOF(sSep) != STRSXP || LENGTH(sSep) < 1)
 	Rf_error("invalid separator");
     sep = CHAR(STRING_ELT(sSep, 0))[0];
