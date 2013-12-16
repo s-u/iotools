@@ -35,6 +35,12 @@ ctapply(X, INDEX, FUN, ..., MERGE=c)
 
   \code{ctapply} requires the \code{INDEX} to contiguous. One (slow) way
   to achieve that is to use \code{\link{sort}} or \code{\link{order}}.
+
+  \code{ctapply} also supports \code{X} to be a matrix in which case it
+  is split row-wise based on \code{INDEX}. The number of rows must match
+  the length of \code{INDEX}. Note that the indexed matrices behave as
+  if \code{drop=FALSE} was used and curretnly \code{dimnames} are only
+  honored if rownames are present.
 }
 %\value{
 %}
@@ -56,5 +62,15 @@ names(i) = as.integer(rnorm(1e6))
 i = i[order(names(i))]
 system.time(tapply(i, names(i), sum))
 system.time(ctapply(i, names(i), sum))
+
+## ctapply() also works on matrices (unlike tapply)
+m=matrix(c("A","A","B","B","B","C","A","B","C","D","E","F","","X","X","Y","Y","Z"),,3)
+ctapply(m, m[,1], identity, MERGE=list)
+ctapply(m, m[,1], identity, MERGE=rbind)
+m2=m[,-1]
+rownames(m2)=m[,1]
+colnames(m2) = c("V1","V2")
+ctapply(m2, rownames(m2), identity, MERGE=list)
+ctapply(m2, rownames(m2), identity, MERGE=rbind)
 }
 \keyword{manip}
