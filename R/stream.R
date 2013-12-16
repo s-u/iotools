@@ -10,7 +10,7 @@ as.output.table <- function(x) paste(names(x), x, sep='\t')
 as.output.matrix <- function(x) { o <- apply(x, 1, paste, collapse='|'); if (!is.null(rownames(x))) o <- paste(rownames(x), o, sep='\t'); o }
 as.output.list <- function(x) paste(names(x), sapply(x, function (e) paste(as.character(e), collapse='|')), sep='\t')
 
-run.chunked <- function(FUN) {
+run.chunked <- function(FUN, formatter=mstrsplit) {
   load("stream.RData", .GlobalEnv)
   if (!is.null(.GlobalEnv$load.packages)) try(for(i in .GlobalEnv$load.packages) require(i, quietly=TRUE, character.only=TRUE), silent=TRUE)
   input <- file("stdin", "rb")
@@ -19,13 +19,13 @@ run.chunked <- function(FUN) {
   while (TRUE) {
     chunk <- read.chunk(reader)
     if (!length(chunk)) break
-    writeLines(as.output(FUN(.GlobalEnv$formatter(chunk))), output)
+    writeLines(as.output(FUN(formatter(chunk))), output)
   }
   invisible(TRUE)
 }
 
-run.map <- function() run.chunked(.GlobalEnv$map)
-run.reduce <- function() run.chunked(.GlobalEnv$reduce)
+run.map <- function() run.chunked(.GlobalEnv$map, .GlobalEnv$map.formatter)
+run.reduce <- function() run.chunked(.GlobalEnv$reduce, .GlobalEnv$red.formatter)
 
 chunk.apply <- function(input, FUN, ..., cr.max.size=33554432) {
   if (!inherits(inherits, "ChunkHeader"))

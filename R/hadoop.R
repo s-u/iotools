@@ -10,8 +10,17 @@ hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, for
   if (missing(output)) output <- hpath(sprintf("/tmp/io-hmr-temp-%d-%s", Sys.getpid(), .rn(4)))
   if (missing(job.name)) job.name <- sprintf("RCloud:iotools:hmr-%s", .rn(2))
   if (!inherits(input, "HDFSpath")) stop("Sorry, you have to have the input in HDFS for now")
-  if (missing(formatter) && inherits(input, "hinput")) formatter <- attr(input, "formatter")
-  if (missing(formatter)) formatter <- mstrsplit
+  map.formatter <- NULL
+  red.formatter <- NULL
+  if (missing(formatter) && inherits(input, "hinput")) map.formatter <- attr(input, "formatter")
+  if (!missing(formatter)) {
+    if (is.list(formatter)) {
+      map.formatter <- formatter$map
+      red.formatter <- formatter$reduce
+    } else map.formatter <- red.formatter <- formatter
+  }
+  if (is.null(map.formatter)) map.formatter <- mstrsplit
+  if (is.null(red.formatter)) red.formatter <- mstrsplit
   hh <- Sys.getenv("HADOOP_HOME")
   if (!nzchar(hh)) hh <- Sys.getenv("HADOOP_PREFIX")
   if (!nzchar(hh)) hh <- "/usr/lib/hadoop"
@@ -24,7 +33,8 @@ hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, for
     if (is.list(aux)) for (n in names(aux)) e[[n]] <- aux[[n]]
     else if (is.character(aux)) for (n in aux) e[[n]] <- get(n) else stop("invalid aux")
   }
-  e$formatter <- formatter
+  e$map.formatter <- map.formatter
+  e$red.formatter <- red.formatter
   e$map <- map
   e$reduce <- reduce
   e$load.packages <- packages
@@ -34,8 +44,8 @@ hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, for
   on.exit(setwd(owd))
   setwd(f)
   save(list=ls(envir=e, all.names=TRUE), envir=e, file="stream.RData")
-  map.cmd <- if (identical(map, identity)) "" else "-mapper \"R --slave --vanilla -e 'iotools:::run.map()'\""
-  reduce.cmd <- if (identical(reduce, identity)) "" else "-reducer \"R --slave --vanilla -e 'iotools:::run.reduce()'\""
+  map.cmd <- if (identical(map, identity)) "" else if (is.character(map)) paste("-mapper", shQuote(map[1L])) else "-mapper \"R --slave --vanilla -e 'iotools:::run.map()'\""
+  reduce.cmd <- if (identical(reduce, identity)) "" else if (is.character(reduce)) paste("-reducer", shQuote(reduce[1L])) else "-reducer \"R --slave --vanilla -e 'iotools:::run.reduce()'\""
   extraD <- if (missing(reducers)) "" else paste0("-D mapred.reduce.tasks=", as.integer(reducers))
   system(paste(
                shQuote(hcmd), "jar", shQuote(sj),
