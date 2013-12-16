@@ -81,7 +81,7 @@ SEXP ctapply_(SEXP args) {
 		snprintf(cbuf, sizeof(cbuf), "%g", REAL(by)[i0]);
 		name = cbuf;
 	    }
-	    SET_TAG(tail, install(name));
+	    if (*name) SET_TAG(tail, install(name));
 	}
 	UNPROTECT(1); /* eres */
     }
