@@ -27,8 +27,8 @@ run.chunked <- function(FUN, formatter=mstrsplit) {
 run.map <- function() run.chunked(.GlobalEnv$map, .GlobalEnv$map.formatter)
 run.reduce <- function() run.chunked(.GlobalEnv$reduce, .GlobalEnv$red.formatter)
 
-chunk.apply <- function(input, FUN, ..., cr.max.size=33554432) {
-  if (!inherits(inherits, "ChunkHeader"))
+chunk.apply <- function(input, FUN, ..., CH.MERGE=rbind, CH.MAX.SIZE=33554432) {
+  if (!inherits(inherits, "ChunkReader"))
     reader <- chunk.reader(input)
-  .Call(chunk_apply, reader, cr.max.size, FUN, parent.frame(), .External(pass, ...))
+  .Call(chunk_apply, reader, CH.MAX.SIZE, CH.MERGE, FUN, parent.frame(), .External(pass, ...))
 }

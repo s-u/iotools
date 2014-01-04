@@ -104,15 +104,22 @@ SEXP chunk_read(SEXP sReader, SEXP sMaxSize) {
     return R_NilValue;
 }
 
-SEXP chunk_apply(SEXP sReader, SEXP sMaxSize, SEXP sFUN, SEXP rho, SEXP sDots) {
+SEXP chunk_apply(SEXP sReader, SEXP sMaxSize, SEXP sMerge, SEXP sFUN, SEXP rho, SEXP sDots) {
   SEXP head = R_NilValue, tail = R_NilValue, elt;
+  int pc = 0;
   while (LENGTH(elt = chunk_read(sReader, sMaxSize)) > 0) {
     SEXP val = eval(LCONS(sFUN, CONS(elt, sDots)), rho);
-    if (head == R_NilValue)
-      tail = head = PROTECT(CONS(elt, R_NilValue));
-    else
-      tail = SETCDR(tail, CONS(elt, R_NilValue));
+    if (head == R_NilValue) {
+      tail = head = PROTECT(CONS(val, R_NilValue));
+      pc++;
+    } else
+      tail = SETCDR(tail, CONS(val, R_NilValue));
   }
+  if (sMerge != R_NilValue) {
+    head = eval(PROTECT(LCONS(sMerge, head)), rho);
+    pc++;
+  }
+  if (pc) UNPROTECT(pc);
   return head;
 }
 
