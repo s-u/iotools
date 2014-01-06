@@ -8,7 +8,7 @@
   into a character matrix according to the separators.
 }
 \usage{
-mstrsplit(x, sep = "|", nsep = NA, line = 1L, quiet = FALSE)
+mstrsplit(x, sep = "|", nsep = NA, line = 1L, quiet = FALSE, ncol = NA)
 }
 \arguments{
   \item{x}{character vector (each element is treated as a row) or a raw
@@ -20,7 +20,9 @@ mstrsplit(x, sep = "|", nsep = NA, line = 1L, quiet = FALSE)
     error reports, not used for actual processing}
   \item{quiet}{logical, if \code{TRUE} then \code{mstrsplit} will not
     fail on parsing errors, otherwise input not matching the format
-    (e.g. more columns in subsequent lines) will cause an error.}
+    (e.g. more columns than expected) will cause an error.}
+  \item{ncol}{number of columns to expect. If \code{NA} then the number
+    of columns is guessed from the first line.}
 }
 \details{
   If the input is a raw vector, then it is interpreted as ASCII content
@@ -30,11 +32,12 @@ mstrsplit(x, sep = "|", nsep = NA, line = 1L, quiet = FALSE)
   If \code{nsep} is specified then all characters up to (but excluding)
   the occurrence of \code{nsep} are treated as the row name. The
   remaining characters are split using the \code{sep} character into
-  fields (columns). The first line of the input determines the number of
-  columns. \code{mstrsplit} will fail with an error if any subsequent
-  line contains more columns (unless \code{quiet} is \code{TRUE}).
-  Subsequent lines can contain fewer columns in which case
-  they are set to \code{NA}.
+  fields (columns). If \code{ncol} is \code{NA} then the first line of
+  the input determines the number of columns. \code{mstrsplit} will fail
+  with an error if any line contains more columns then expected unless
+  \code{quiet} is \code{TRUE}. Excessive columns are ignored in that
+  case. Lines may contain fewer columns in which case they are set to
+  \code{NA}.
 
   The processing is geared thowards efficiency - no string re-coding is
   performed and raw input vector is processed directly, avoiding the
@@ -59,5 +62,9 @@ mstrsplit(x, sep = "|", nsep = NA, line = 1L, quiet = FALSE)
   m <- mstrsplit(c,, "\t")
   rownames(m)
   m
+  ## use raw vectors instead
+  r <- charToRaw(paste(c, collapse="\n"))
+  mstrsplit(r)
+  mstrsplit(r, nsep="\t")
 }
 \keyword{manip}

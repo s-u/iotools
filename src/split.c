@@ -9,8 +9,8 @@
    if specified but not present in the line, it is assumed to be ""
    everything else is split on <sep>
    the first line defines the number of columns for the entire matrix */
-static SEXP mat_split_mem(const char *mem, size_t len, char sep, int nsep, unsigned long line, int flags) {
-    unsigned int ncol = 1, nrow, i, N;
+static SEXP mat_split_mem(const char *mem, size_t len, char sep, int nsep, unsigned long line, int flags, int use_ncol) {
+    unsigned int ncol = (unsigned int) use_ncol, nrow, i, N;
     unsigned long lines = 1;
     SEXP res, rnam, zerochar = 0;
     const char *e = memchr(mem, '\n', len), *ee = mem + len, *c, *l;
@@ -24,7 +24,10 @@ static SEXP mat_split_mem(const char *mem, size_t len, char sep, int nsep, unsig
     if (nsep >= 0) { /* skip the names part */	
 	if ((c = memchr(c, nsep, e - c))) c++; else c = mem;
     }
-    while ((c = memchr(c, (unsigned char) sep, e - c))) { ncol++; c++; }
+    if (use_ncol < 1) { /* if the user didn't specify columns, guess them from the first row */
+	ncol = 1;
+	while ((c = memchr(c, (unsigned char) sep, e - c))) { ncol++; c++; }
+    }
     N = ncol * nrow;
     res = PROTECT(allocMatrix(STRSXP, nrow, ncol));
     if (nsep >= 0) {
@@ -53,7 +56,7 @@ static SEXP mat_split_mem(const char *mem, size_t len, char sep, int nsep, unsig
 	while ((c = memchr(l, (unsigned char) sep, le - l))) {
 	    if (j >= N) {
 		if (flags & FL_RESILIENT) break;
-                Rf_error("line %lu: too many columns (expected %d)", line + (unsigned long)(i + 1), ncol);
+                Rf_error("line %lu: too many columns (expected %u)", line + (unsigned long)(i + 1), ncol);
 	    }
 	    SET_STRING_ELT(res, j, Rf_mkCharLen(l, c - l));
 	    l = c + 1;
@@ -62,7 +65,7 @@ static SEXP mat_split_mem(const char *mem, size_t len, char sep, int nsep, unsig
 	/* add last entry */
         if (j >= N) {
 	    if (!(flags & FL_RESILIENT))
-		Rf_error("line %lu: too many columns (expected %d)", line + (unsigned long)(i + 1), ncol);
+		Rf_error("line %lu: too many columns (expected %u)", line + (unsigned long)(i + 1), ncol);
 	} else {
 	    SET_STRING_ELT(res, j, Rf_mkCharLen(l, le - l));
 	    /* fill up with NAs */
@@ -79,9 +82,10 @@ static SEXP mat_split_mem(const char *mem, size_t len, char sep, int nsep, unsig
     return res;
 }
 
-SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sLine, SEXP sResilient) {
+SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sLine, SEXP sResilient, SEXP sNcol) {
     unsigned long line = 1;
     unsigned int ncol = 1, nrow, np = 0, i, N, resilient = asInteger(sResilient);
+    int use_ncol = asInteger(sNcol);
     int nsep = -1;
     SEXP res, rnam, zerochar = 0;
     char sep;
@@ -97,7 +101,7 @@ SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sLine, SEXP sResilient) {
     sep = CHAR(STRING_ELT(sSep, 0))[0];
     if (TYPEOF(s) != STRSXP) {
 	if (TYPEOF(s) == RAWSXP)
-	    return mat_split_mem((const char*) RAW(s), LENGTH(s), sep, nsep, line, resilient ? FL_RESILIENT : 0);
+	    return mat_split_mem((const char*) RAW(s), LENGTH(s), sep, nsep, line, resilient ? FL_RESILIENT : 0, use_ncol);
 	s = PROTECT(coerceVector(s, STRSXP));
 	np++;
     }
@@ -106,10 +110,13 @@ SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sLine, SEXP sResilient) {
 	if (np) UNPROTECT(np);
 	return allocMatrix(STRSXP, 0, 0);
     }
-    /* count the separators in the first line (ncol=1 on init) */
-    c = CHAR(STRING_ELT(s, 0));
-    while ((c = strchr(c, sep))) { ncol++; c++; }
-    if (nsep == (int) (unsigned char) sep) ncol--;
+    if (use_ncol < 1) {
+	/* count the separators in the first line (ncol=1 on init) */
+	c = CHAR(STRING_ELT(s, 0));
+	while ((c = strchr(c, sep))) { ncol++; c++; }
+	/* if sep and nsep are the same then the first "column" is the key and not the column */
+	if (nsep == (int) (unsigned char) sep) ncol--;
+    } else ncol = use_ncol;
     N = ncol * nrow;
     res = PROTECT(allocMatrix(STRSXP, nrow, ncol));
     if (nsep >= 0) {
@@ -134,7 +141,7 @@ SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sLine, SEXP sResilient) {
 	while ((c = strchr(l, sep))) {
 	    if (j >= N) {
 		if (resilient) break;
-		Rf_error("line %lu: too many columns (expected %d)", line + (unsigned long)(i + 1), ncol);
+		Rf_error("line %lu: too many columns (expected %u)", line + (unsigned long)(i + 1), ncol);
 	    }
 	    SET_STRING_ELT(res, j, Rf_mkCharLen(l, c - l));
 	    l = c + 1;
@@ -143,7 +150,7 @@ SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sLine, SEXP sResilient) {
 	/* add last entry */
 	if (j >= N) {
 	    if (!resilient)
-		Rf_error("line %lu: too many columns (expected %d)", line + (unsigned long)(i + 1), ncol);
+		Rf_error("line %lu: too many columns (expected %u)", line + (unsigned long)(i + 1), ncol);
 	} else {
 	    SET_STRING_ELT(res, j, Rf_mkChar(l));
 	    /* fill up with NAs */
