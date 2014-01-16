@@ -7,7 +7,9 @@
   Experimental Hadoop chunk-processing code
 }
 \description{
-  \code{readSTDIN} reads lines from \code{stdin}
+  \code{hmr} runs a chunk-wise Hadoop job.
+
+  \code{hpath} and \code{hinput} define HDFS file path and input source.
 }
 \usage{
 hmr(input, output, map = identity, reduce = identity, job.name,
@@ -29,7 +31,8 @@ hinput(path, formatter = function(x) {
   \item{aux}{either a character vector of symbols names or a named list
     of values to push to the compute nodes}
   \item{formatter}{formatter to use. It is optional in \code{hmr} if the
-    input source already contains a formatter definition}
+    input source already contains a formatter definition. See below for
+    details on how to sepcify separate formatters.}
   \item{packages}{character vector of package names to attach on the
     compute nodes}
   \item{reducers}{optional integer specifying the number of parallel
@@ -47,6 +50,15 @@ hinput(path, formatter = function(x) {
   the \code{reduce} function - the flow is the same as in the \code{map}
   case. Then result is returned as HDFS path. Either \code{map} or
   \code{reduce} can be \code{identity} (the default).
+
+  If the \code{formatter} if omitted then the format is taken from
+  input object (if it has one) or the default formatter
+  (\code{mstrsplit} with \code{'\t'} as key spearator, \code{'|'} as
+  column separator) is used. If formater is a function then the same
+  formatter is used for both the map and reduce steps. If separate
+  formatters are required, the \code{formatter} can be a list with the
+  entries \code{map} and/or \code{reduce} specifying the corresponding
+  formatter function.
 
   \code{hpath} tags a string as HDFS path. The sole purpose here is to
   distiguish local and HDFS paths.

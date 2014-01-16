@@ -1,7 +1,11 @@
 hpath <- function(path) structure(path, class="HDFSpath")
 
+.default.formatter <- function(x) {
+  y <- mstrsplit(x, "|", "\t")
+  if (ncol(y) == 1L) y[, 1] else y
+}
 
-
+# FIXME: we could use .default.formatter except that it's hidden - we should export it and document it
 hinput <- function(path, formatter=function(x) { y <- mstrsplit(x, '|', '\t'); if (ncol(y) == 1L) y[,1] else y })
   structure(path, class=c("hinput", "HDFSpath"), formatter=formatter)
 
@@ -19,8 +23,8 @@ hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, for
       red.formatter <- formatter$reduce
     } else map.formatter <- red.formatter <- formatter
   }
-  if (is.null(map.formatter)) map.formatter <- mstrsplit
-  if (is.null(red.formatter)) red.formatter <- mstrsplit
+  if (is.null(map.formatter)) map.formatter <- .default.formatter
+  if (is.null(red.formatter)) red.formatter <- .default.formatter
   hh <- Sys.getenv("HADOOP_HOME")
   if (!nzchar(hh)) hh <- Sys.getenv("HADOOP_PREFIX")
   if (!nzchar(hh)) hh <- "/usr/lib/hadoop"
