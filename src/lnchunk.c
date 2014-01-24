@@ -40,7 +40,7 @@ SEXP create_chunk_reader(SEXP sConn, SEXP sMaxLine) {
     
     con = getConnection(asInteger(sConn));
     r = (chunk_read_t*) malloc(sizeof(chunk_read_t) + max_line);
-    if (!r) Rf_error("Unable to allocate %.3Mb for line buffer", ((double) max_line) / (1024.0*1024.0));
+    if (!r) Rf_error("Unable to allocate %.3fMb for line buffer", ((double) max_line) / (1024.0*1024.0));
     r->len   = 0;
     r->sConn = sConn;
     r->con   = con;
