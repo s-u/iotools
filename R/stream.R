@@ -16,10 +16,35 @@ run.chunked <- function(FUN, formatter=mstrsplit) {
   input <- file("stdin", "rb")
   output <- stdout()
   reader <- chunk.reader(input)
-  while (TRUE) {
-    chunk <- read.chunk(reader)
-    if (!length(chunk)) break
-    writeLines(as.output(FUN(formatter(chunk))), output)
+  parallel <- if (!is.null(.GlobalEnv$parallel.chunks)) as.integer(.GlobalEnv$parallel.chunks)[1L] else 1L
+  if (is.na(parallel) || parallel < 2L) {
+    while (TRUE) {
+      chunk <- read.chunk(reader)
+      if (!length(chunk)) break
+      writeLines(as.output(FUN(formatter(chunk))), output)
+    }
+  } else {
+    require(parallel)
+    pj <- list(parallel)
+    i <- 1L
+    while (TRUE) {
+      chunk <- read.chunk(reader)
+      if (!length(chunk)) break
+      if (inherits(pj[[i]], "parallelJob")) {
+        writeLines(mccollect(pj[[i]]), output)
+	mccollect(pj[[i]]) ## close child
+	pj[[i]] <- integer()
+      }
+      pj[[i]] <- mcparallel(as.output(FUN(formatter(chunk))))
+      i <- (i %% parallel) + 1L
+    }
+    ## collect all outstanding jobs
+    while (inherits(pj[[i]], "parallelJob")) {
+      writeLines(mccollect(pj[[i]]), output)
+      mccollect(pj[[i]]) ## close child
+      pj[[i]] <- integer()
+      i <- (i %% parallel) + 1L
+    }
   }
   invisible(TRUE)
 }
