@@ -127,12 +127,11 @@ SEXP pass(SEXP args) {
   return CDR(args);
 }
 
-#if 0 /* this is not complete ... */
 /* find out the size of the last key chunk
    this is typically used to hold back the chunk associated with the last key
    as we can't tell if it will continue in the next chunk */
 SEXP last_key_back(SEXP sRaw, SEXP sKeySep) {
-    const char *c, *e, *ln, *key, *keye, *key0;
+    const char *c, *e, *ln, *key, *keye, *key0, *last, *laste;
     char sep;
     if (TYPEOF(sKeySep) != STRSXP || LENGTH(sKeySep) < 1) Rf_error("Missing or invalid key separator");
     if (TYPEOF(sRaw) != RAWSXP) Rf_error("invalid object - must be a raw vector");
@@ -141,20 +140,30 @@ SEXP last_key_back(SEXP sRaw, SEXP sKeySep) {
     e = c + LENGTH(sRaw);
     ln = e - 1;
     while (ln >= c && *ln == '\n') ln--; /* skip trailing newlines */
+    e = ln + 1;
     while (--ln >= c && *ln != '\n') {}
     if (ln < c) /* no newline found */
-	return R_NilValue;
+	return ScalarInteger(0);
     /* find the key */
     key0 = key = ln + 1;
     if (!(keye = memchr(key, (unsigned char) sep, e - key)))
-	return ScalarInteger(LENGTH(sRaw) + 1); /* no key -> nothing to hold back */
+	keye = e; /* no separator - take the whole line as a key */
     /* step back and look for more keys */
+    last = key0;
+    laste = keye;
     while (ln >= c) {
-	while (--ln >= c && *ln != '\n') {}
-	if (ln >= c) {
-	    const char *ckey = ln + 1;
-	    
+	/* unfortunately there is no memrchr so we have to do it the slow way */
+	while (--ln > c && *ln != '\n') {}
+	{
+	    const char *ckey = ln, *ckeye, *keye;
+	    if (*ckey == '\n') ckey++;
+	    ckeye = memchr(ckey, sep, last - ckey); /* FIXME: this will do partial matching if there are no seps */
+	    if (!ckeye) ckeye = laste; /* no sep -> take whole line */
+	    if (memcmp(ckey, last, ckeye - ckey)) break; /* get out if keys don't match */
+	    /* keys match - move up last */
+	    last = ckey;
+	    laste = ckeye;
 	}
     }
+    return ScalarInteger(last - c);
 }
-#endif
