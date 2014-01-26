@@ -25,7 +25,7 @@ run.chunked <- function(FUN, formatter=mstrsplit) {
     }
   } else {
     require(parallel)
-    pj <- list(parallel)
+    pj <- replicate(parallel, integer())
     i <- 1L
     while (TRUE) {
       chunk <- read.chunk(reader)
