@@ -157,9 +157,10 @@ SEXP last_key_back(SEXP sRaw, SEXP sKeySep) {
 	{
 	    const char *ckey = ln, *ckeye, *keye;
 	    if (*ckey == '\n') ckey++;
-	    ckeye = memchr(ckey, sep, last - ckey); /* FIXME: this will do partial matching if there are no seps */
-	    if (!ckeye) ckeye = laste; /* no sep -> take whole line */
-	    if (memcmp(ckey, last, ckeye - ckey)) break; /* get out if keys don't match */
+	    ckeye = memchr(ckey, sep, last - ckey);
+	    if (!ckeye) ckeye = last - 1; /* no sep -> take whole line (minus \n) */
+	    if ((laste - last) != (ckeye - ckey) || /* check length first */
+		memcmp(ckey, last, ckeye - ckey)) break; /* get out if keys don't match */
 	    /* keys match - move up last */
 	    last = ckey;
 	    laste = ckeye;
