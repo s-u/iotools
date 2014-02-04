@@ -105,22 +105,105 @@ SEXP chunk_read(SEXP sReader, SEXP sMaxSize) {
 }
 
 SEXP chunk_apply(SEXP sReader, SEXP sMaxSize, SEXP sMerge, SEXP sFUN, SEXP rho, SEXP sDots) {
-  SEXP head = R_NilValue, tail = R_NilValue, elt;
-  int pc = 0;
-  while (LENGTH(elt = chunk_read(sReader, sMaxSize)) > 0) {
-    SEXP val = eval(LCONS(sFUN, CONS(elt, sDots)), rho);
-    if (head == R_NilValue) {
-      tail = head = PROTECT(CONS(val, R_NilValue));
-      pc++;
-    } else
-      tail = SETCDR(tail, CONS(val, R_NilValue));
-  }
-  if (sMerge != R_NilValue) {
-    head = eval(PROTECT(LCONS(sMerge, head)), rho);
-    pc++;
-  }
-  if (pc) UNPROTECT(pc);
-  return head;
+    SEXP head = R_NilValue, tail = R_NilValue, elt;
+    int pc = 0;
+    while (LENGTH(elt = chunk_read(sReader, sMaxSize)) > 0) {
+	SEXP val = eval(LCONS(sFUN, CONS(elt, sDots)), rho);
+	if (head == R_NilValue) {
+	    tail = head = PROTECT(CONS(val, R_NilValue));
+	    pc++;
+	} else
+	    tail = SETCDR(tail, CONS(val, R_NilValue));
+    }
+    if (sMerge != R_NilValue) {
+	head = eval(PROTECT(LCONS(sMerge, head)), rho);
+	pc++;
+    }
+    if (pc) UNPROTECT(pc);
+    return head;
+}
+
+SEXP last_key_back(SEXP sRaw, SEXP sKeySep);
+
+SEXP chunk_tapply(SEXP sReader, SEXP sMaxSize, SEXP sMerge, SEXP sSep, SEXP sFUN, SEXP rho, SEXP sDots) {
+    SEXP head = R_NilValue, tail = R_NilValue, elt, cache, c_tail;
+    long in_cache = 0;
+    int pc = 1;
+    c_tail = cache = PROTECT(CONS(R_NilValue, R_NilValue));
+    while (1) {
+	elt = chunk_read(sReader, sMaxSize);
+	if (LENGTH(elt) == 0) { /* EOF */
+	    if (CAR(cache) == R_NilValue) /* any cache left? */
+		break; /* no? outa here ... */
+	    else { /* replace elt with the content of the cache */
+		char *ptr = (char*) RAW(elt = allocVector(RAWSXP, in_cache));
+		SEXP w = cache;
+		while (w != R_NilValue) {
+		    memcpy(ptr, RAW(CAR(w)), LENGTH(CAR(w)));
+		    ptr += LENGTH(CAR(w));
+		    w = CDR(w);
+		}
+		in_cache = 0;
+		SETCDR(cache, R_NilValue);
+		SETCAR(cache, R_NilValue);
+		c_tail = cache;
+	    }
+	} else {
+	    SEXP sHold = last_key_back(elt, sSep);
+	    int hold = INTEGER(sHold)[0];
+	    Rprintf("hold %d of %d (in-cache=%ld)\n", hold, LENGTH(elt), in_cache);
+	    if (!hold) { /* all the same key -- append to cache */
+		c_tail = SETCDR(c_tail, CONS(elt, R_NilValue));
+		continue; /* and skip the eval step */
+	    }
+
+	    if (CAR(cache) != R_NilValue) { /* anything to merge with ? */
+		SEXP nv, w = cache;
+		char *ptr;
+		in_cache += hold; /* ok, have to alloc+copy, unfortunately */
+		ptr = (char*) RAW(nv = allocVector(RAWSXP, in_cache));
+		while (w != R_NilValue) {
+		    memcpy(ptr, RAW(CAR(w)), LENGTH(CAR(w)));
+		    ptr += LENGTH(CAR(w));
+		    w = CDR(w);
+		}
+		memcpy(ptr, RAW(elt), hold);
+		PROTECT(nv);
+		w = allocVector(RAWSXP, LENGTH(elt) - hold);
+		memcpy(RAW(w), RAW(elt) + hold, LENGTH(elt) - hold);
+		SETCAR(cache, w);
+		SETCDR(cache, R_NilValue);
+		c_tail = cache;
+		in_cache = LENGTH(w);
+		UNPROTECT(1);
+		elt = nv;
+	    } else { /* no cache - create one */
+		SEXP nv = allocVector(RAWSXP, LENGTH(elt) - hold);
+		memcpy(RAW(nv), RAW(elt) + hold, LENGTH(elt) - hold);
+		SETCAR(cache, nv);
+		SETCDR(cache, R_NilValue);
+		/* we can do in-place shortening */
+		SETLENGTH(elt, hold);
+		c_tail = cache;
+		in_cache = LENGTH(nv);
+	    }
+	}
+
+	{
+	    SEXP val = eval(LCONS(sFUN, CONS(elt, sDots)), rho);
+	    if (head == R_NilValue) {
+		tail = head = PROTECT(CONS(val, R_NilValue));
+		    pc++;
+	    } else
+		tail = SETCDR(tail, CONS(val, R_NilValue));
+	}
+    }
+    if (sMerge != R_NilValue) {
+	head = eval(PROTECT(LCONS(sMerge, head)), rho);
+	pc++;
+    }
+    if (pc) UNPROTECT(pc);
+    return head;
 }
 
 SEXP pass(SEXP args) {
