@@ -30,8 +30,21 @@ hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, for
   if (!nzchar(hh)) hh <- "/usr/lib/hadoop"
   hcmd <- file.path(hh, "bin", "hadoop")
   if (!file.exists(hcmd)) stop("Cannot find working Hadoop home. Set HADOOP_PREFIX if in doubt.")
+  sj <- Sys.getenv("HADOOP_STREAMING_JAR")
+  if (!nzchar(sj)) sj <- character()
   sj <- Sys.glob(file.path(hh, "contrib", "streaming", "*.jar"))
-  if (!length(sj)) stop("Cannot find streaming JAR - it should be in <HADOOP_PREFIX>/contrib/streaming")
+  if (!length(sj)) {
+    ver <- system(paste(shQuote(hcmd), "version"), intern=TRUE)[1L]
+    if (!isTRUE(grepl("^Hadoop ", ver)))
+      stop("Unable to detect hadoop version via", hcmd, ", if needed set HADOOP_PREFIX accordingly")
+    ver <- gsub("^Hadoop ", "", ver)
+    if (ver >= "2.0") { ## try to use the class path
+      cp <- strsplit(system(paste(shQuote(hcmd), "classpath"), intern=TRUE), .Platform$path.sep, TRUE)[[1]]
+      sj <- unlist(lapply(cp, function(o) Sys.glob(file.path(gsub("\\*$","",o), "hadoop-streaming-*.jar"))))
+    }
+  }
+  if (!length(sj)) 
+    stop("Cannot find streaming JAR - set HADOOP_STREAMING_JAR or make sure you have a complete Hadoop installation")
   e <- new.env(parent=emptyenv())
   if (!missing(aux)) {
     if (is.list(aux)) for (n in names(aux)) e[[n]] <- aux[[n]]
@@ -52,7 +65,7 @@ hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, for
   reduce.cmd <- if (identical(reduce, identity)) "" else if (is.character(reduce)) paste("-reducer", shQuote(reduce[1L])) else "-reducer \"R --slave --vanilla -e 'iotools:::run.reduce()'\""
   extraD <- if (missing(reducers)) "" else paste0("-D mapred.reduce.tasks=", as.integer(reducers))
   system(paste(
-               shQuote(hcmd), "jar", shQuote(sj),
+               shQuote(hcmd), "jar", shQuote(sj[1L]),
                "-D", "mapreduce.reduce.input.limit=-1",
                "-D", shQuote(paste0("mapred.job.name=", job.name)), extraD,
                "-input", shQuote(input),
