@@ -31,8 +31,7 @@ hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, for
   hcmd <- file.path(hh, "bin", "hadoop")
   if (!file.exists(hcmd)) stop("Cannot find working Hadoop home. Set HADOOP_PREFIX if in doubt.")
   sj <- Sys.getenv("HADOOP_STREAMING_JAR")
-  if (!nzchar(sj)) sj <- character()
-  sj <- Sys.glob(file.path(hh, "contrib", "streaming", "*.jar"))
+  if (!nzchar(sj)) sj <- Sys.glob(file.path(hh, "contrib", "streaming", "*.jar"))
   if (!length(sj)) {
     ver <- system(paste(shQuote(hcmd), "version"), intern=TRUE)[1L]
     if (!isTRUE(grepl("^Hadoop ", ver)))
