@@ -1,5 +1,5 @@
 Package: iotools
-Version: 0.1-1
+Version: 0.1-2
 Title: I/O tools for streaming
 Author: Simon Urbanek <Simon.Urbanek@r-project.org>
 Maintainer: Simon Urbanek <Simon.Urbanek@r-project.org>
