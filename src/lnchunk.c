@@ -131,11 +131,12 @@ SEXP chunk_tapply(SEXP sReader, SEXP sMaxSize, SEXP sMerge, SEXP sSep, SEXP sFUN
     int pc = 1;
     c_tail = cache = PROTECT(CONS(R_NilValue, R_NilValue));
     while (1) {
-	elt = chunk_read(sReader, sMaxSize);
+	PROTECT(elt = chunk_read(sReader, sMaxSize));
 	if (LENGTH(elt) == 0) { /* EOF */
-	    if (CAR(cache) == R_NilValue) /* any cache left? */
+	    if (CAR(cache) == R_NilValue) { /* any cache left? */
+		UNPROTECT(1);
 		break; /* no? outa here ... */
-	    else { /* replace elt with the content of the cache */
+	    } else { /* replace elt with the content of the cache */
 		char *ptr = (char*) RAW(elt = allocVector(RAWSXP, in_cache));
 		SEXP w = cache;
 		while (w != R_NilValue) {
@@ -151,18 +152,36 @@ SEXP chunk_tapply(SEXP sReader, SEXP sMaxSize, SEXP sMerge, SEXP sSep, SEXP sFUN
 	} else {
 	    SEXP sHold = last_key_back(elt, sSep);
 	    int hold = INTEGER(sHold)[0];
+#if CHUNK_DEBUG
 	    Rprintf("hold %d of %d (in-cache=%ld)\n", hold, LENGTH(elt), in_cache);
+	    {
+		char tmp[128], *tc = tmp;
+		memcpy(tmp, RAW(elt) + hold - 16, 32);
+		while (*tc) { if (*tc == '\n') *tc = '#'; tc++; }
+		tmp[32] = 0;
+		Rprintf("   [%s]\n", tmp);
+		Rprintf("                    ^\n");
+	    }
+#endif
 	    if (!hold) { /* all the same key -- append to cache */
 		c_tail = SETCDR(c_tail, CONS(elt, R_NilValue));
+		UNPROTECT(1); /* elt */
 		continue; /* and skip the eval step */
 	    }
 
 	    if (CAR(cache) != R_NilValue) { /* anything to merge with ? */
 		SEXP nv, w = cache;
 		char *ptr;
+#if CHUNK_DEBUG		
+		int total = 0, cid = 0;
+#endif
 		in_cache += hold; /* ok, have to alloc+copy, unfortunately */
 		ptr = (char*) RAW(nv = allocVector(RAWSXP, in_cache));
 		while (w != R_NilValue) {
+#if CHUNK_DEBUG
+		    Rprintf(" - copying from cache #%d, %d (total %d)\n",
+			    ++cid, LENGTH(CAR(w)), total += LENGTH(CAR(w)));
+#endif
 		    memcpy(ptr, RAW(CAR(w)), LENGTH(CAR(w)));
 		    ptr += LENGTH(CAR(w));
 		    w = CDR(w);
@@ -191,6 +210,7 @@ SEXP chunk_tapply(SEXP sReader, SEXP sMaxSize, SEXP sMerge, SEXP sSep, SEXP sFUN
 
 	{
 	    SEXP val = eval(LCONS(sFUN, CONS(elt, sDots)), rho);
+	    UNPROTECT(1); /* elt */
 	    if (head == R_NilValue) {
 		tail = head = PROTECT(CONS(val, R_NilValue));
 		    pc++;
@@ -238,7 +258,7 @@ SEXP last_key_back(SEXP sRaw, SEXP sKeySep) {
 	/* unfortunately there is no memrchr so we have to do it the slow way */
 	while (--ln > c && *ln != '\n') {}
 	{
-	    const char *ckey = ln, *ckeye, *keye;
+	    const char *ckey = ln, *ckeye;
 	    if (*ckey == '\n') ckey++;
 	    ckeye = memchr(ckey, sep, last - ckey);
 	    if (!ckeye) ckeye = last - 1; /* no sep -> take whole line (minus \n) */
