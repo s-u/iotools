@@ -14,7 +14,7 @@
 \usage{
 hmr(input, output, map = identity, reduce = identity, job.name,
     aux, formatter, packages = loadedNamespaces(), reducers,
-    remote, wait=TRUE)
+    remote, wait=TRUE, hadoop.conf)
 hpath(path)
 hinput(path, formatter = function(x) {
     y <- mstrsplit(x, "|", "\t")
@@ -46,6 +46,8 @@ hinput(path, formatter = function(x) {
   \item{wait}{logical, if \code{TRUE} then the command returns after the
     job finished, otherwise the command returns after the job has been
     submitted}
+  \item{hadoop.conf}{optional string, path to the hadoop configuration
+    directory for submission}
   \item{path}{HDFS path}
 }
 \details{

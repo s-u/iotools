@@ -31,7 +31,8 @@ hinput <- function(path, formatter=function(x) { y <- mstrsplit(x, '|', '\t'); i
   list(hh=hh, hcmd=hcmd, sj=sj)
 }  
 
-hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, formatter, packages=loadedNamespaces(), reducers, remote, wait=TRUE) {
+hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, formatter, packages=loadedNamespaces(), reducers,
+                remote, wait=TRUE, hadoop.conf) {
   .rn <- function(n) paste(sprintf("%04x", as.integer(runif(n, 0, 65536))), collapse='')
   if (missing(output)) output <- hpath(sprintf("/tmp/io-hmr-temp-%d-%s", Sys.getpid(), .rn(4)))
   if (missing(job.name)) job.name <- sprintf("RCloud:iotools:hmr-%s", .rn(2))
@@ -83,8 +84,10 @@ hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, for
                "-output", shQuote(output),
                "-file", "stream.RData",
                map.cmd, reduce.cmd)
+  cfg <- ""
+  if (!missing(hadoop.conf)) cfg <- paste("--config", shQuote(hadoop.conf)[1L])
   if (missing(remote)) {
-    h0 <- paste(shQuote(hcmd), "jar", shQuote(sj[1L]))
+    h0 <- paste(shQuote(hcmd), cfg, "jar", shQuote(sj[1L]))
     cmd <- paste(h0, hargs)
     system(cmd, wait=wait)
   } else {
@@ -122,7 +125,7 @@ hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, for
     if (!inherits(remote, "RserveConnection"))
       stop("remote must be an RserveConnection or a string denoting a server to connect to")
     l <- list(stream=readBin("stream.RData", raw(), file.info("stream.RData")$size),
-              hargs=hargs)
+              hargs=hargs, hcfg=cfg)
     RSclient::RS.eval(remote, as.call(list(quote(iotools:::.remote.cmd), l)), wait=wait, lazy=FALSE)
   }
   output
@@ -140,7 +143,7 @@ hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, for
   h <- .hadoop.detect()
   if (!length(h$sj)) 
     stop("Cannot find streaming JAR - set HADOOP_STREAMING_JAR or make sure you have a complete Hadoop installation")
-  h0 <- paste(shQuote(h$hcmd), "jar", shQuote(h$sj[1L]))
+  h0 <- paste(shQuote(h$hcmd), args$hcfg, "jar", shQuote(h$sj[1L]))
   cmd <- paste(h0, hargs)
   ## FIXME: we could pass-through wait so that we get notified if the submission fails
   ##        but it may be slow if stream.RData is huge
