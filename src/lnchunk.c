@@ -209,13 +209,15 @@ SEXP chunk_tapply(SEXP sReader, SEXP sMaxSize, SEXP sMerge, SEXP sSep, SEXP sFUN
 	}
 
 	{
-	    SEXP val = eval(LCONS(sFUN, CONS(elt, sDots)), rho);
-	    UNPROTECT(1); /* elt */
-	    if (head == R_NilValue) {
-		tail = head = PROTECT(CONS(val, R_NilValue));
+	    SEXP val = eval(PROTECT(LCONS(sFUN, CONS(elt, sDots))), rho);
+	    UNPROTECT(2); /* eval + elt */
+	    if (sMerge != R_NilValue) {
+		if (head == R_NilValue) {
+		    tail = head = PROTECT(CONS(val, R_NilValue));
 		    pc++;
-	    } else
-		tail = SETCDR(tail, CONS(val, R_NilValue));
+		} else
+		    tail = SETCDR(tail, CONS(val, R_NilValue));
+	    }
 	}
     }
     if (sMerge != R_NilValue) {
