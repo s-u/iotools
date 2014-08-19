@@ -137,13 +137,17 @@ SEXP chunk_tapply(SEXP sReader, SEXP sMaxSize, SEXP sMerge, SEXP sSep, SEXP sFUN
 		UNPROTECT(1);
 		break; /* no? outa here ... */
 	    } else { /* replace elt with the content of the cache */
-		char *ptr = (char*) RAW(elt = allocVector(RAWSXP, in_cache));
-		SEXP w = cache;
-		while (w != R_NilValue) {
-		    memcpy(ptr, RAW(CAR(w)), LENGTH(CAR(w)));
-		    ptr += LENGTH(CAR(w));
-		    w = CDR(w);
+		UNPROTECT(1);
+		{ /* copy all cache into a new vector */
+		    char *ptr = (char*) RAW(PROTECT(elt = allocVector(RAWSXP, in_cache)));
+		    SEXP w = cache;
+		    while (w != R_NilValue) {
+			memcpy(ptr, RAW(CAR(w)), LENGTH(CAR(w)));
+			ptr += LENGTH(CAR(w));
+			w = CDR(w);
+		    }
 		}
+		/* empty cache */
 		in_cache = 0;
 		SETCDR(cache, R_NilValue);
 		SETCAR(cache, R_NilValue);
@@ -164,7 +168,11 @@ SEXP chunk_tapply(SEXP sReader, SEXP sMaxSize, SEXP sMerge, SEXP sSep, SEXP sFUN
 	    }
 #endif
 	    if (!hold) { /* all the same key -- append to cache */
+#if CHUNK_DEBUG
+		Rprintf(" - single key chunk\n");
+#endif
 		c_tail = SETCDR(c_tail, CONS(elt, R_NilValue));
+		in_cache += LENGTH(elt);
 		UNPROTECT(1); /* elt */
 		continue; /* and skip the eval step */
 	    }
@@ -172,11 +180,12 @@ SEXP chunk_tapply(SEXP sReader, SEXP sMaxSize, SEXP sMerge, SEXP sSep, SEXP sFUN
 	    if (CAR(cache) != R_NilValue) { /* anything to merge with ? */
 		SEXP nv, w = cache;
 		char *ptr;
+		long orig_len = LENGTH(elt);
 #if CHUNK_DEBUG		
 		int total = 0, cid = 0;
 #endif
 		in_cache += hold; /* ok, have to alloc+copy, unfortunately */
-		ptr = (char*) RAW(nv = allocVector(RAWSXP, in_cache));
+		ptr = (char*) RAW(PROTECT(nv = allocVector(RAWSXP, in_cache)));
 		while (w != R_NilValue) {
 #if CHUNK_DEBUG
 		    Rprintf(" - copying from cache #%d, %d (total %d)\n",
@@ -187,17 +196,18 @@ SEXP chunk_tapply(SEXP sReader, SEXP sMaxSize, SEXP sMerge, SEXP sSep, SEXP sFUN
 		    w = CDR(w);
 		}
 		memcpy(ptr, RAW(elt), hold);
-		PROTECT(nv);
-		w = allocVector(RAWSXP, LENGTH(elt) - hold);
+		PROTECT(nv);  /* new elt */
+		w = PROTECT(allocVector(RAWSXP, LENGTH(elt) - hold));
 		memcpy(RAW(w), RAW(elt) + hold, LENGTH(elt) - hold);
 		SETCAR(cache, w);
 		SETCDR(cache, R_NilValue);
 		c_tail = cache;
 		in_cache = LENGTH(w);
-		UNPROTECT(1);
+		UNPROTECT(3); /* elt, nv, w */
 		elt = nv;
+		PROTECT(elt);
 	    } else { /* no cache - create one */
-		SEXP nv = allocVector(RAWSXP, LENGTH(elt) - hold);
+		SEXP nv = PROTECT(allocVector(RAWSXP, LENGTH(elt) - hold));
 		memcpy(RAW(nv), RAW(elt) + hold, LENGTH(elt) - hold);
 		SETCAR(cache, nv);
 		SETCDR(cache, R_NilValue);
@@ -205,6 +215,7 @@ SEXP chunk_tapply(SEXP sReader, SEXP sMaxSize, SEXP sMerge, SEXP sSep, SEXP sFUN
 		SETLENGTH(elt, hold);
 		c_tail = cache;
 		in_cache = LENGTH(nv);
+		UNPROTECT(1);
 	    }
 	}
 
