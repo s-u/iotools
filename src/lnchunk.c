@@ -66,7 +66,10 @@ static SEXP key_process(chunk_read_t *r, SEXP val) {
     SEXP nv;
     PROTECT(val);
     if (!LENGTH(val)) { /* no new content, only flush cache */
-	if (!r->in_cache) return val; /* nothing in cache, pass-thru */
+	if (!r->in_cache) {
+	    UNPROTECT(1);
+	    return val; /* nothing in cache, pass-thru */
+	}
 	UNPROTECT(1); /* replace val with a new allocation for the cache content */
 	PROTECT(val = allocVector(RAWSXP, r->in_cache));
 	{ /* copy all cache into a new vector */
