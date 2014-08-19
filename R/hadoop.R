@@ -74,7 +74,7 @@ hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, for
   on.exit(setwd(owd))
   setwd(f)
   save(list=ls(envir=e, all.names=TRUE), envir=e, file="stream.RData")
-  map.cmd <- if (identical(map, identity)) "" else if (is.character(map)) paste("-mapper", shQuote(map[1L])) else "-mapper \"R --slave --vanilla -e 'iotools:::run.map()'\""
+  map.cmd <- if (identical(map, identity)) "-mapper cat" else if (is.character(map)) paste("-mapper", shQuote(map[1L])) else "-mapper \"R --slave --vanilla -e 'iotools:::run.map()'\""
   reduce.cmd <- if (identical(reduce, identity)) "" else if (is.character(reduce)) paste("-reducer", shQuote(reduce[1L])) else "-reducer \"R --slave --vanilla -e 'iotools:::run.reduce()'\""
   extraD <- if (missing(reducers)) "" else paste0("-D mapred.reduce.tasks=", as.integer(reducers))
   if (!missing(hadoop.opt) && length(hadoop.opt)) {

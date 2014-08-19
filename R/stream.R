@@ -11,6 +11,15 @@ as.output.matrix <- function(x) { o <- apply(x, 1, paste, collapse='|'); if (!is
 as.output.list <- function(x) paste(names(x), sapply(x, function (e) paste(as.character(e), collapse='|')), sep='\t')
 
 run.chunked <- function(FUN, formatter=mstrsplit, key.sep=NULL) {
+  ## FIXME: it would be nice to test for 'identity' but since this may have been serialized, identical() may not help here ...
+  if (is.null(FUN) || identical(FUN, identity)) { ## pass-through, no chunking, just behave like `cat`
+    input <- file("stdin", "rb")
+    N <- 16777216L ## 16Mb
+    while (length(buf <- readBin(input, raw(), N))) .Call(stdout_writeBin, buf, FALSE)
+    .Call(stdout_writeBin, raw(), TRUE) ## just a flush
+    return(invisible(TRUE))
+  }
+
   load("stream.RData", .GlobalEnv)
   if (!is.null(.GlobalEnv$load.packages)) try(for(i in .GlobalEnv$load.packages) require(i, quietly=TRUE, character.only=TRUE), silent=TRUE)
   input <- file("stdin", "rb")
