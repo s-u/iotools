@@ -10,12 +10,12 @@ as.output.table <- function(x) paste(names(x), x, sep='\t')
 as.output.matrix <- function(x) { o <- apply(x, 1, paste, collapse='|'); if (!is.null(rownames(x))) o <- paste(rownames(x), o, sep='\t'); o }
 as.output.list <- function(x) paste(names(x), sapply(x, function (e) paste(as.character(e), collapse='|')), sep='\t')
 
-run.chunked <- function(FUN, formatter=mstrsplit) {
+run.chunked <- function(FUN, formatter=mstrsplit, key.sep=NULL) {
   load("stream.RData", .GlobalEnv)
   if (!is.null(.GlobalEnv$load.packages)) try(for(i in .GlobalEnv$load.packages) require(i, quietly=TRUE, character.only=TRUE), silent=TRUE)
   input <- file("stdin", "rb")
   output <- stdout()
-  reader <- chunk.reader(input)
+  reader <- chunk.reader(input, sep=key.sep)
   parallel <- if (!is.null(.GlobalEnv$parallel.chunks)) as.integer(.GlobalEnv$parallel.chunks)[1L] else 1L
   if (is.na(parallel) || parallel < 2L) {
     while (TRUE) {
@@ -50,7 +50,7 @@ run.chunked <- function(FUN, formatter=mstrsplit) {
 }
 
 run.map <- function() run.chunked(.GlobalEnv$map, .GlobalEnv$map.formatter)
-run.reduce <- function() run.chunked(.GlobalEnv$reduce, .GlobalEnv$red.formatter)
+run.reduce <- function() run.chunked(.GlobalEnv$reduce, .GlobalEnv$red.formatter, "\t")
 
 chunk.apply <- function(input, FUN, ..., CH.MERGE=rbind, CH.MAX.SIZE=33554432) {
   if (!inherits(inherits, "ChunkReader"))
