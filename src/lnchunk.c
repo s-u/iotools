@@ -24,6 +24,8 @@ static void chunk_fin(SEXP ref) {
     chunk_read_t *r = (chunk_read_t*) R_ExternalPtrAddr(ref);
     if (r) {
 	if (r->sConn) R_ReleaseObject(r->sConn);
+	if (r->cache && r->cache != R_NilValue) R_ReleaseObject(r->cache);
+	/* Note: tail is just a pointer in the cache chain = no release */
 	free(r);
     }
 }
