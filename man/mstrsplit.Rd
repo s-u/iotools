@@ -8,7 +8,8 @@
   into a character matrix according to the separators.
 }
 \usage{
-mstrsplit(x, sep = "|", nsep = NA, line = 1L, quiet = FALSE, ncol = NA)
+mstrsplit(x, sep = "|", nsep = NA, line = 1L, quiet = FALSE, ncol = NA,
+          type=c("character", "numeric"))
 }
 \arguments{
   \item{x}{character vector (each element is treated as a row) or a raw
@@ -23,12 +24,14 @@ mstrsplit(x, sep = "|", nsep = NA, line = 1L, quiet = FALSE, ncol = NA)
     (e.g. more columns than expected) will cause an error.}
   \item{ncol}{number of columns to expect. If \code{NA} then the number
     of columns is guessed from the first line.}
+  \item{type}{one of 'character' or 'numeric'; if the latter, the output
+    will be converted to numeric values on the fly}
 }
 \details{
   If the input is a raw vector, then it is interpreted as ASCII content
   with LF (\code{'\n'}) characters separating lines. If the input is a
   character vector then each element is treated as a line.
-  
+
   If \code{nsep} is specified then all characters up to (but excluding)
   the occurrence of \code{nsep} are treated as the row name. The
   remaining characters are split using the \code{sep} character into
