@@ -9,13 +9,27 @@ hpath <- function(path) structure(path, class="HDFSpath")
 hinput <- function(path, formatter=function(x) { y <- mstrsplit(x, '|', '\t'); if (ncol(y) == 1L) y[,1] else y })
   structure(path, class=c("hinput", "HDFSpath"), formatter=formatter)
 
+c.hinput = function(..., recursive = FALSE) {
+  if(!all(sapply(list(...), function(v) all.equal(attr(v, "class"), c("hinput", "HDFSpath"))) == TRUE)) {
+    warning("Using default combine function as not all objects are of class hinput")
+    return(c(sapply(list(...), function(v) as.character(v))))
+  }
+  formatters = sapply(list(...), function(v) attr(v, "formatter"))
+  if(!all(sapply(formatters, all.equal, formatters[[1]]))) {
+    stop("All input objects must have the same formatters")
+  }
+
+  return(structure(unique(c(sapply(list(...), function(v) as.character(v)))),
+         class=c("hinput", "HDFSpath"), formatter=formatters[[1]]))
+}
+
 .hadoop.detect <- function() {
   hh <- Sys.getenv("HADOOP_HOME")
   if (!nzchar(hh)) hh <- Sys.getenv("HADOOP_PREFIX")
   if (!nzchar(hh)) hh <- "/usr/lib/hadoop"
   hcmd <- file.path(hh, "bin", "hadoop")
   if (!file.exists(hcmd)) stop("Cannot find working Hadoop home. Set HADOOP_PREFIX if in doubt.")
-  
+
   sj <- Sys.getenv("HADOOP_STREAMING_JAR")
   if (!nzchar(sj)) sj <- Sys.glob(file.path(hh, "contrib", "streaming", "*.jar"))
   if (!length(sj)) {
@@ -29,7 +43,7 @@ hinput <- function(path, formatter=function(x) { y <- mstrsplit(x, '|', '\t'); i
     }
   }
   list(hh=hh, hcmd=hcmd, sj=sj)
-}  
+}
 
 hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, formatter, packages=loadedNamespaces(), reducers,
                 remote, wait=TRUE, hadoop.conf, hadoop.opt) {
@@ -49,15 +63,15 @@ hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, for
   if (is.null(map.formatter)) map.formatter <- .default.formatter
   if (is.null(red.formatter)) red.formatter <- .default.formatter
 
-  if (missing(remote)) { 
+  if (missing(remote)) {
     h <- .hadoop.detect()
     hh <- h$hh
     hcmd <- h$hcmd
     sj <- h$sj
-    if (!length(sj)) 
+    if (!length(sj))
       stop("Cannot find streaming JAR - set HADOOP_STREAMING_JAR or make sure you have a complete Hadoop installation")
   }
-  
+
   e <- new.env(parent=emptyenv())
   if (!missing(aux)) {
     if (is.list(aux)) for (n in names(aux)) e[[n]] <- aux[[n]]
@@ -84,7 +98,7 @@ hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, for
     else
       paste(extraD, paste("-D", shQuote(paste0(hon, "=", as.character(hadoop.opt))), collapse=" "))
   }
-    
+
   hargs <- paste(
                "-D", "mapreduce.reduce.input.limit=-1",
                "-D", shQuote(paste0("mapred.job.name=", job.name)), extraD,
@@ -128,7 +142,7 @@ hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, for
         on.exit(RSclient::RS.close(remote))
         if (!is.null(auth.user))
           RSclient::RS.login(remote, auth.user, auth.pwd, authkey=RSclient::RS.authkey())
-      }    
+      }
     }
     if (!inherits(remote, "RserveConnection"))
       stop("remote must be an RserveConnection or a string denoting a server to connect to")
@@ -149,7 +163,7 @@ hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, for
   hargs <- args$hargs
 
   h <- .hadoop.detect()
-  if (!length(h$sj)) 
+  if (!length(h$sj))
     stop("Cannot find streaming JAR - set HADOOP_STREAMING_JAR or make sure you have a complete Hadoop installation")
   h0 <- paste(shQuote(h$hcmd), args$hcfg, "jar", shQuote(h$sj[1L]))
   cmd <- paste(h0, hargs)
