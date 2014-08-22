@@ -1,5 +1,6 @@
 #include <Rinternals.h>
 #include <string.h>
+#include <stdlib.h>
 
 #define FL_RESILIENT 1 /* do not fail, proceed even if the input has more columns */
 
