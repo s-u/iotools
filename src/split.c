@@ -9,10 +9,13 @@
    if specified but not present in the line, it is assumed to be ""
    everything else is split on <sep>
    the first line defines the number of columns for the entire matrix */
-static SEXP mat_split_mem(const char *mem, size_t len, char sep, int nsep, unsigned long line, int flags, int use_ncol) {
+static SEXP mat_split_mem(const char *mem, size_t len, char sep, int nsep, unsigned long line, int flags, int use_ncol, const int type_flag) {
     unsigned int ncol = (unsigned int) use_ncol, nrow, i, N;
     unsigned long lines = 1;
     SEXP res, rnam, zerochar = 0;
+    char * num_val = malloc(100);
+    double * res_ptr;
+    const double na_char = R_atof("");
     const char *e = memchr(mem, '\n', len), *ee = mem + len, *c, *l;
     if (!e) e = ee; /* e is the end of the first line - needed to count columns */
     c = mem;
@@ -29,7 +32,12 @@ static SEXP mat_split_mem(const char *mem, size_t len, char sep, int nsep, unsig
 	while ((c = memchr(c, (unsigned char) sep, e - c))) { ncol++; c++; }
     }
     N = ncol * nrow;
-    res = PROTECT(allocMatrix(STRSXP, nrow, ncol));
+    if(type_flag == 1) {
+      res = PROTECT(allocMatrix(STRSXP, nrow, ncol));
+    } else {
+      res = PROTECT(allocMatrix(REALSXP, nrow, ncol));
+      res_ptr = REAL(res);
+    }
     if (nsep >= 0) {
 	SEXP dimn;
 	dimn = PROTECT(allocVector(VECSXP, 2));
@@ -58,7 +66,13 @@ static SEXP mat_split_mem(const char *mem, size_t len, char sep, int nsep, unsig
 		if (flags & FL_RESILIENT) break;
                 Rf_error("line %lu: too many columns (expected %u)", line + (unsigned long)(i + 1), ncol);
 	    }
-	    SET_STRING_ELT(res, j, Rf_mkCharLen(l, c - l));
+	    if(type_flag == 1) {
+	      SET_STRING_ELT(res, j, Rf_mkCharLen(l, c - l));
+	    } else {
+	      memcpy(num_val, l, c - l);
+	      num_val[c - l] = '\0';
+	      res_ptr[j] = R_atof(num_val);
+	    }
 	    l = c + 1;
             j += nrow;
         }
@@ -67,12 +81,22 @@ static SEXP mat_split_mem(const char *mem, size_t len, char sep, int nsep, unsig
 	    if (!(flags & FL_RESILIENT))
 		Rf_error("line %lu: too many columns (expected %u)", line + (unsigned long)(i + 1), ncol);
 	} else {
-	    SET_STRING_ELT(res, j, Rf_mkCharLen(l, le - l));
-	    /* fill up with NAs */
+	    if(type_flag == 1) {
+	      SET_STRING_ELT(res, j, Rf_mkCharLen(l, le - l));
+	    } else {
+	      memcpy(num_val, l, le - l);
+	      num_val[le - l] = '\0';
+	      res_ptr[j] = R_atof(num_val);
+	    }
+    	    /* fill up with NAs */
 	    j += nrow;
 	    while (j < N) {
-		SET_STRING_ELT(res, j, R_NaString);
-		j += nrow;
+	      if(type_flag == 1) {
+	        SET_STRING_ELT(res, j, R_NaString);
+	      } else {
+                res_ptr[j] = na_char;
+              }
+	      j += nrow;
 	    }
 	}
 	l = le + 1;
