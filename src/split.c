@@ -106,13 +106,17 @@ static SEXP mat_split_mem(const char *mem, size_t len, char sep, int nsep, unsig
     return res;
 }
 
-SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sLine, SEXP sResilient, SEXP sNcol) {
+SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sLine, SEXP sResilient, SEXP sNcol, SEXP sTypeFlag) {
     unsigned long line = 1;
     unsigned int ncol = 1, nrow, np = 0, i, N, resilient = asInteger(sResilient);
     int use_ncol = asInteger(sNcol);
     int nsep = -1;
     SEXP res, rnam, zerochar = 0;
     char sep;
+    char * num_val = malloc(100);
+    const double na_char = R_atof("");
+    const int type_flag = asInteger(sTypeFlag);
+    double * res_ptr;
     const char *c;
 
     if (TYPEOF(sNamesSep) == STRSXP && LENGTH(sNamesSep) > 0) nsep = (int) (unsigned char) *CHAR(STRING_ELT(sNamesSep, 0));
@@ -125,7 +129,7 @@ SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sLine, SEXP sResilient, S
     sep = CHAR(STRING_ELT(sSep, 0))[0];
     if (TYPEOF(s) != STRSXP) {
 	if (TYPEOF(s) == RAWSXP)
-	    return mat_split_mem((const char*) RAW(s), LENGTH(s), sep, nsep, line, resilient ? FL_RESILIENT : 0, use_ncol);
+	    return mat_split_mem((const char*) RAW(s), LENGTH(s), sep, nsep, line, resilient ? FL_RESILIENT : 0, use_ncol, type_flag);
 	s = PROTECT(coerceVector(s, STRSXP));
 	np++;
     }
@@ -142,7 +146,12 @@ SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sLine, SEXP sResilient, S
 	if (nsep == (int) (unsigned char) sep) ncol--;
     } else ncol = use_ncol;
     N = ncol * nrow;
-    res = PROTECT(allocMatrix(STRSXP, nrow, ncol));
+    if(type_flag == 1) {
+      res = PROTECT(allocMatrix(STRSXP, nrow, ncol));
+    } else {
+      res = PROTECT(allocMatrix(REALSXP, nrow, ncol));
+      res_ptr = REAL(res);
+    }
     if (nsep >= 0) {
 	SEXP dn;
 	setAttrib(res, R_DimNamesSymbol, (dn = allocVector(VECSXP, 2)));
@@ -167,7 +176,13 @@ SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sLine, SEXP sResilient, S
 		if (resilient) break;
 		Rf_error("line %lu: too many columns (expected %u)", line + (unsigned long)(i + 1), ncol);
 	    }
-	    SET_STRING_ELT(res, j, Rf_mkCharLen(l, c - l));
+	    if(type_flag == 1) {
+                SET_STRING_ELT(res, j, Rf_mkCharLen(l, c - l));
+            } else {
+                memcpy(num_val, l, c - l);
+                num_val[c - l] = '\0';
+                res_ptr[j] = R_atof(num_val);
+            }
 	    l = c + 1;
 	    j += nrow;
 	}
@@ -176,11 +191,20 @@ SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sLine, SEXP sResilient, S
 	    if (!resilient)
 		Rf_error("line %lu: too many columns (expected %u)", line + (unsigned long)(i + 1), ncol);
 	} else {
-	    SET_STRING_ELT(res, j, Rf_mkChar(l));
+	    if(type_flag == 1) {
+                SET_STRING_ELT(res, j, Rf_mkChar(l));
+            } else {
+                strcpy(num_val, l);
+                res_ptr[j] = R_atof(num_val);
+            }
 	    /* fill up with NAs */
 	    j += nrow;
 	    while (j < N) {
-		SET_STRING_ELT(res, j, R_NaString);
+	        if(type_flag == 1) {
+                     SET_STRING_ELT(res, j, R_NaString);
+                } else {
+                     res_ptr[j] = na_char;
+                }
 		j += nrow;
 	    }
 	}
