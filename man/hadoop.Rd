@@ -14,7 +14,7 @@
 \usage{
 hmr(input, output, map = identity, reduce = identity, job.name,
     aux, formatter, packages = loadedNamespaces(), reducers,
-    remote, wait=TRUE, hadoop.conf, hadoop.opt)
+    remote, wait=TRUE, hadoop.conf)
 hpath(path)
 hinput(path, formatter = function(x) {
     y <- mstrsplit(x, "|", "\t")
@@ -48,12 +48,6 @@ hinput(path, formatter = function(x) {
     submitted}
   \item{hadoop.conf}{optional string, path to the hadoop configuration
     directory for submission}
-  \item{hadoop.opt}{additional Java options to pass to the job - named
-    character vectors are passed as \code{-D<name>=<value}, unnamed
-    vectors are collapsed. Note: this is only a transitional interface
-    to work around deficiencies in the job generation and should only be
-    used as a last measure since the semantics is implementation
-    specific and thus not prtable across systems.}
   \item{path}{HDFS path}
 }
 \details{

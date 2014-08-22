@@ -9,6 +9,20 @@ hpath <- function(path) structure(path, class="HDFSpath")
 hinput <- function(path, formatter=function(x) { y <- mstrsplit(x, '|', '\t'); if (ncol(y) == 1L) y[,1] else y })
   structure(path, class=c("hinput", "HDFSpath"), formatter=formatter)
 
+c.hinput = function(..., recursive = FALSE) {
+  if(!all(sapply(list(...), function(v) all.equal(attr(v, "class"), c("hinput", "HDFSpath"))) == TRUE)) {
+    warning("Using default combine function as not all objects are of class hinput")
+    return(c(sapply(list(...), function(v) as.character(v))))
+  }
+  formatters = sapply(list(...), function(v) attr(v, "formatter"))
+  if(!all(sapply(formatters, all.equal, formatters[[1]]))) {
+    stop("All input objects must have the same formatters")
+  }
+
+  return(structure(unique(c(sapply(list(...), function(v) as.character(v)))),
+         class=c("hinput", "HDFSpath"), formatter=formatters[[1]]))
+}
+
 .hadoop.detect <- function() {
   hh <- Sys.getenv("HADOOP_HOME")
   if (!nzchar(hh)) hh <- Sys.getenv("HADOOP_PREFIX")
@@ -74,7 +88,7 @@ hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, for
   on.exit(setwd(owd))
   setwd(f)
   save(list=ls(envir=e, all.names=TRUE), envir=e, file="stream.RData")
-  map.cmd <- if (identical(map, identity)) "-mapper cat" else if (is.character(map)) paste("-mapper", shQuote(map[1L])) else "-mapper \"R --slave --vanilla -e 'iotools:::run.map()'\""
+  map.cmd <- if (identical(map, identity)) "" else if (is.character(map)) paste("-mapper", shQuote(map[1L])) else "-mapper \"R --slave --vanilla -e 'iotools:::run.map()'\""
   reduce.cmd <- if (identical(reduce, identity)) "" else if (is.character(reduce)) paste("-reducer", shQuote(reduce[1L])) else "-reducer \"R --slave --vanilla -e 'iotools:::run.reduce()'\""
   extraD <- if (missing(reducers)) "" else paste0("-D mapred.reduce.tasks=", as.integer(reducers))
   if (!missing(hadoop.opt) && length(hadoop.opt)) {

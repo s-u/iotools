@@ -12,7 +12,7 @@
   \code{read.chunk} reads the next chunk using the specified reader.
 }
 \usage{
-chunk.reader(source, max.line = 65536L, sep = NULL)
+chunk.reader(source, max.line = 65536L)
 read.chunk(reader, max.size = 33554432L)
 }
 \arguments{
@@ -20,10 +20,6 @@ read.chunk(reader, max.size = 33554432L)
     file name) specifying the source}
   \item{max.line}{maximum length of one line (in byets) - determines the
     size of the read buffer, default is 64kb}
-  \item{sep}{optional string: key separator if key-aware chunking is to
-    be used}
-    character is considered a key and subsequent records holding the
-    same key are guaranteed to be 
   \item{reader}{reader object as returned by \code{chunk.reader}}
   \item{max.size}{maximum size of the chunk (in bytes), default is 32Mb}
 }
@@ -33,14 +29,6 @@ read.chunk(reader, max.size = 33554432L)
   preserving the integrity of input lines. \code{read.chunk} is used to
   read the actual chunks. The implementation is very thin to prevert
   copying of large vectors for best efficiency.
-
-  If \code{sep} is set to a string, it is treated as a single-character
-  separator character. If specified, prefix in the input up to the
-  specified character is treated as a key and subsequent lines with the
-  same key are guaranteed to be processed in the same chunk. Note that
-  this implies that the chunk size is practically unlimited, since this
-  may force accumulation of multiple chunks to satisfy this condition.
-  Obviously, this increases the processing and memory overhead.
 }
 \value{
   \code{chunk.reader} returns an object that can be used by
@@ -49,8 +37,8 @@ read.chunk(reader, max.size = 33554432L)
 
   \code{read.chunk} returns a raw vector holding the next chunk. It is
   deliberate that \code{read.chunk} does NOT return a character vector
-  since that would reasult in a high performance penalty. Please use the
-  appropriate parser to convert the chunk into data, see
+  sicne that would reasult in a high performance penalty. Please use the
+  approriate parser to convert the chunk into data, see
   \code{\link{mstrsplit}}.
 }
 \author{
