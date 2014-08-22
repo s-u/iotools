@@ -63,6 +63,25 @@ SEXP create_chunk_reader(SEXP sConn, SEXP sMaxLine, SEXP sKeySep) {
     return res;
 }
 
+static void flush_cache(chunk_read_t *r, SEXP nv, const Rbyte* src, long len) {
+    /* copy all cache into a new vector */
+    char *ptr = (char*) RAW(nv);
+    SEXP w = r->cache;
+    while (w != R_NilValue) {
+	if (CAR(w) != R_NilValue) {
+	    memcpy(ptr, RAW(CAR(w)), LENGTH(CAR(w)));
+	    ptr += LENGTH(CAR(w));
+	}
+	w = CDR(w);
+    }
+    /* append extra content (if desired) */
+    if (len) memcpy(ptr, src, len);
+    r->in_cache = 0;
+    SETCDR(r->cache, R_NilValue);
+    SETCAR(r->cache, R_NilValue);
+    r->tail = r->cache;
+}
+
 static SEXP key_process(chunk_read_t *r, SEXP val) {
     int hold = 0;
     SEXP nv;
@@ -74,22 +93,7 @@ static SEXP key_process(chunk_read_t *r, SEXP val) {
 	}
 	UNPROTECT(1); /* replace val with a new allocation for the cache content */
 	PROTECT(val = allocVector(RAWSXP, r->in_cache));
-	{ /* copy all cache into a new vector */
-	    char *ptr = (char*) RAW(val);
-	    SEXP w = r->cache;
-	    while (w != R_NilValue) {
-		if (CAR(w) != R_NilValue) {
-		    memcpy(ptr, RAW(CAR(w)), LENGTH(CAR(w)));
-		    ptr += LENGTH(CAR(w));
-		}
-		w = CDR(w);
-	    }
-	}
-	/* empty cache */
-	r->in_cache = 0;
-	SETCDR(r->cache, R_NilValue);
-	SETCAR(r->cache, R_NilValue);
-	r->tail = r->cache;
+	flush_cache(r, val, 0, 0);
 	UNPROTECT(1); /* val */
 	return val;
     }
@@ -111,19 +115,7 @@ static SEXP key_process(chunk_read_t *r, SEXP val) {
 	}
 	/* has cache - create a new vector for cache and val content */
 	nv = PROTECT(allocVector(RAWSXP, hold + r->in_cache));
-	{ /* copy all cache into a new vector */
-	    char *ptr = (char*) RAW(nv);
-	    SEXP w = r->cache;
-	    while (w != R_NilValue) {
-		if (CAR(w) != R_NilValue) {
-		    memcpy(ptr, RAW(CAR(w)), LENGTH(CAR(w)));
-		    ptr += LENGTH(CAR(w));
-		}
-		w = CDR(w);
-	    }
-	    /* append hold from val */
-	    memcpy(ptr, RAW(val), hold);
-	}
+	flush_cache(r, nv, RAW(val), hold);
 	/* only keep the remainder in the cache */
 	r->in_cache = LENGTH(val) - hold;
 	{
@@ -132,7 +124,6 @@ static SEXP key_process(chunk_read_t *r, SEXP val) {
 	    SETCDR(r->cache, R_NilValue);
 	    SETCAR(r->cache, cv);
 	}
-	r->tail = r->cache;
 	UNPROTECT(3); /* cv, nv, val */
 	return nv;
     }
@@ -166,15 +157,17 @@ SEXP chunk_read(SEXP sReader, SEXP sMaxSize) {
     }
     while (i < max_size) {
 	n = R_ReadConnection(r->con, c + i, max_size - i);
-	if (n < 1) { /* nothing to read, return all we got so far */
+	if (n < 1) { /* nothing to read, return all we got so far - this is EOF */
 	    SEXP tmp = res;
+	    if (r->keySep && r->in_cache) { /* combine the last chunk with the cache in one go */
+		res = PROTECT(allocVector(RAWSXP, i + r->in_cache));
+		flush_cache(r, res, RAW(tmp), i);
+		UNPROTECT(2); /* res(tmp), res */
+		return res;
+	    }
 	    res = allocVector(RAWSXP, i);
 	    if (LENGTH(res)) memcpy(RAW(res), RAW(tmp), i);
-	    if (r->keySep) {
-		res = key_process(r, res);
-		if (res == R_NilValue) /* content read but all in the cache */
-		    res = key_process(r, allocVector(RAWSXP, 0)); /* signal EOF */
-	    }
+	    /* no need to post-process, since the cache must be empty otherwise special case above would kick in */
 	    UNPROTECT(1);
 	    return res;
 	}
