@@ -14,9 +14,8 @@ static SEXP mat_split_mem(const char *mem, size_t len, char sep, int nsep, unsig
     unsigned int ncol = (unsigned int) use_ncol, nrow, i, N;
     unsigned long lines = 1;
     SEXP res, rnam, zerochar = 0;
-    char * num_val = malloc(100);
+    char num_buf[48];
     double * res_ptr;
-    const double na_char = R_atof("");
     const char *e = memchr(mem, '\n', len), *ee = mem + len, *c, *l;
     if (!e) e = ee; /* e is the end of the first line - needed to count columns */
     c = mem;
@@ -67,12 +66,20 @@ static SEXP mat_split_mem(const char *mem, size_t len, char sep, int nsep, unsig
 		if (flags & FL_RESILIENT) break;
                 Rf_error("line %lu: too many columns (expected %u)", line + (unsigned long)(i + 1), ncol);
 	    }
-	    if(type_flag == 1) {
-	      SET_STRING_ELT(res, j, Rf_mkCharLen(l, c - l));
-	    } else {
-	      memcpy(num_val, l, c - l);
-	      num_val[c - l] = '\0';
-	      res_ptr[j] = R_atof(num_val);
+	    if (type_flag == 1)
+		SET_STRING_ELT(res, j, Rf_mkCharLen(l, c - l));
+	    else {
+		int len = (int) (c - l);
+		if (len >= sizeof(num_buf)) {
+		    if (!(flags & FL_RESILIENT))
+			Rf_error("line %lu: too large value to a numeric - aborting (use quiet=TRUE to replace them quietly by NAs)",
+				 line + (unsigned long)(i + 1));
+		    res_ptr[j] = NA_REAL;
+		} else {
+		    memcpy(num_buf, l, len);
+		    num_buf[len] = 0;
+		    res_ptr[j] = R_atof(num_buf);
+		}
 	    }
 	    l = c + 1;
             j += nrow;
@@ -82,22 +89,29 @@ static SEXP mat_split_mem(const char *mem, size_t len, char sep, int nsep, unsig
 	    if (!(flags & FL_RESILIENT))
 		Rf_error("line %lu: too many columns (expected %u)", line + (unsigned long)(i + 1), ncol);
 	} else {
-	    if(type_flag == 1) {
-	      SET_STRING_ELT(res, j, Rf_mkCharLen(l, le - l));
-	    } else {
-	      memcpy(num_val, l, le - l);
-	      num_val[le - l] = '\0';
-	      res_ptr[j] = R_atof(num_val);
+	    if(type_flag == 1)
+		SET_STRING_ELT(res, j, Rf_mkCharLen(l, le - l));
+	    else {
+		int len = (int) (le - l);
+		if (len >= sizeof(num_buf)) {
+		    if (!(flags & FL_RESILIENT))
+			Rf_error("line %lu: too large value to a numeric - aborting (use quiet=TRUE to replace them quietly by NAs)",
+				 line + (unsigned long)(i + 1));
+		    res_ptr[j] = NA_REAL;
+		} else {
+		    memcpy(num_buf, l, len);
+		    num_buf[len] = 0;
+		    res_ptr[j] = R_atof(num_buf);
+		}
 	    }
     	    /* fill up with NAs */
 	    j += nrow;
 	    while (j < N) {
-	      if(type_flag == 1) {
-	        SET_STRING_ELT(res, j, R_NaString);
-	      } else {
-                res_ptr[j] = na_char;
-              }
-	      j += nrow;
+		if (type_flag == 1)
+		    SET_STRING_ELT(res, j, R_NaString);
+		else
+		    res_ptr[j] = NA_REAL;
+		j += nrow;
 	    }
 	}
 	l = le + 1;
@@ -114,8 +128,7 @@ SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sLine, SEXP sResilient, S
     int nsep = -1;
     SEXP res, rnam, zerochar = 0;
     char sep;
-    char * num_val = malloc(100);
-    const double na_char = R_atof("");
+    char num_buf[48];
     const int type_flag = asInteger(sTypeFlag);
     double * res_ptr;
     const char *c;
@@ -177,12 +190,20 @@ SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sLine, SEXP sResilient, S
 		if (resilient) break;
 		Rf_error("line %lu: too many columns (expected %u)", line + (unsigned long)(i + 1), ncol);
 	    }
-	    if(type_flag == 1) {
+	    if (type_flag == 1) 
                 SET_STRING_ELT(res, j, Rf_mkCharLen(l, c - l));
-            } else {
-                memcpy(num_val, l, c - l);
-                num_val[c - l] = '\0';
-                res_ptr[j] = R_atof(num_val);
+	    else {
+		int len = (int) (c - l);
+		if (len >= sizeof(num_buf)) {
+		    if (!resilient)
+			Rf_error("line %lu: too large value to a numeric - aborting (use quiet=TRUE to replace them quietly by NAs)",
+				 line + (unsigned long)(i + 1));
+		    res_ptr[j] = NA_REAL;
+		} else {
+		    memcpy(num_buf, l, len);
+		    num_buf[len] = 0;
+		    res_ptr[j] = R_atof(num_buf);
+		}
             }
 	    l = c + 1;
 	    j += nrow;
@@ -192,20 +213,17 @@ SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sLine, SEXP sResilient, S
 	    if (!resilient)
 		Rf_error("line %lu: too many columns (expected %u)", line + (unsigned long)(i + 1), ncol);
 	} else {
-	    if(type_flag == 1) {
+	    if (type_flag == 1)
                 SET_STRING_ELT(res, j, Rf_mkChar(l));
-            } else {
-                strcpy(num_val, l);
-                res_ptr[j] = R_atof(num_val);
-            }
+	    else
+                res_ptr[j] = R_atof(l);
 	    /* fill up with NAs */
 	    j += nrow;
 	    while (j < N) {
-	        if(type_flag == 1) {
-                     SET_STRING_ELT(res, j, R_NaString);
-                } else {
-                     res_ptr[j] = na_char;
-                }
+	        if (type_flag == 1)
+		    SET_STRING_ELT(res, j, R_NaString);
+		else
+		    res_ptr[j] = NA_REAL;
 		j += nrow;
 	    }
 	}
