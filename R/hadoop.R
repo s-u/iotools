@@ -46,7 +46,7 @@ c.hinput = function(..., recursive = FALSE) {
 }
 
 hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, formatter, packages=loadedNamespaces(), reducers,
-                remote, wait=TRUE, hadoop.conf, hadoop.opt) {
+                remote, wait=TRUE, hadoop.conf, hadoop.opt, R="R") {
   .rn <- function(n) paste(sprintf("%04x", as.integer(runif(n, 0, 65536))), collapse='')
   if (missing(output)) output <- hpath(sprintf("/tmp/io-hmr-temp-%d-%s", Sys.getpid(), .rn(4)))
   if (missing(job.name)) job.name <- sprintf("RCloud:iotools:hmr-%s", .rn(2))
@@ -88,8 +88,8 @@ hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, for
   on.exit(setwd(owd))
   setwd(f)
   save(list=ls(envir=e, all.names=TRUE), envir=e, file="stream.RData")
-  map.cmd <- if (identical(map, identity)) "-mapper cat" else if (is.character(map)) paste("-mapper", shQuote(map[1L])) else "-mapper \"R --slave --vanilla -e 'iotools:::run.map()'\""
-  reduce.cmd <- if (identical(reduce, identity)) "" else if (is.character(reduce)) paste("-reducer", shQuote(reduce[1L])) else "-reducer \"R --slave --vanilla -e 'iotools:::run.reduce()'\""
+  map.cmd <- if (identical(map, identity)) "-mapper cat" else if (is.character(map)) paste("-mapper", shQuote(map[1L])) else paste0("-mapper \"",R," --slave --vanilla -e 'iotools:::run.map()'\"")
+  reduce.cmd <- if (identical(reduce, identity)) "" else if (is.character(reduce)) paste("-reducer", shQuote(reduce[1L])) else paste0("-reducer \"",R," --slave --vanilla -e 'iotools:::run.reduce()'\"")
   extraD <- if (missing(reducers)) "" else paste0("-D mapred.reduce.tasks=", as.integer(reducers))
   if (!missing(hadoop.opt) && length(hadoop.opt)) {
     hon <- names(hadoop.opt)
