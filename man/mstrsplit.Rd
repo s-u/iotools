@@ -8,7 +8,7 @@
   into a character matrix according to the separators.
 }
 \usage{
-mstrsplit(x, sep = "|", nsep = NA, line = 1L, quiet = FALSE, ncol = NA,
+mstrsplit(x, sep = "|", nsep = NA, line = 1L, strict = TRUE, ncol = NA,
           type=c("character", "numeric"))
 }
 \arguments{
@@ -19,7 +19,7 @@ mstrsplit(x, sep = "|", nsep = NA, line = 1L, quiet = FALSE, ncol = NA,
     row names are included}
   \item{line}{line number of the first line - used to identify lines in
     error reports, not used for actual processing}
-  \item{quiet}{logical, if \code{TRUE} then \code{mstrsplit} will not
+  \item{strict}{logical, if \code{FALSE} then \code{mstrsplit} will not
     fail on parsing errors, otherwise input not matching the format
     (e.g. more columns than expected) will cause an error.}
   \item{ncol}{number of columns to expect. If \code{NA} then the number
@@ -38,7 +38,7 @@ mstrsplit(x, sep = "|", nsep = NA, line = 1L, quiet = FALSE, ncol = NA,
   fields (columns). If \code{ncol} is \code{NA} then the first line of
   the input determines the number of columns. \code{mstrsplit} will fail
   with an error if any line contains more columns then expected unless
-  \code{quiet} is \code{TRUE}. Excessive columns are ignored in that
+  \code{strict} is \code{FALSE}. Excessive columns are ignored in that
   case. Lines may contain fewer columns in which case they are set to
   \code{NA}.
 
