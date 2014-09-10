@@ -5,8 +5,7 @@ hpath <- function(path) structure(path, class="HDFSpath")
   if (ncol(y) == 1L) y[, 1] else y
 }
 
-# FIXME: we could use .default.formatter except that it's hidden - we should export it and document it
-hinput <- function(path, formatter=function(x) { y <- mstrsplit(x, '|', '\t'); if (ncol(y) == 1L) y[,1] else y })
+hinput <- function(path, formatter=.default.formatter)
   structure(path, class=c("hinput", "HDFSpath"), formatter=formatter)
 
 .hadoop.detect <- function() {

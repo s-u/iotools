@@ -16,12 +16,7 @@ hmr(input, output, map = identity, reduce = identity, job.name,
     aux, formatter, packages = loadedNamespaces(), reducers,
     remote, wait=TRUE, hadoop.conf, hadoop.opt, R="R")
 hpath(path)
-hinput(path, formatter = function(x) {
-    y <- mstrsplit(x, "|", "\t")
-    if (ncol(y) == 1L)
-        y[, 1]
-    else y
-})
+hinput(path, formatter = .default.formatter)
 }
 \arguments{
   \item{input}{input data - see details}
