@@ -19,5 +19,5 @@ Hadoop Map Reduce by writing code that is very natural - very much
 like using `lapply` on data chunks without the need to know anything
 about Hadoop. See [the WiKi page](https://github.com/s-u/iotools/wiki)
 for the idea and
-(hmr)[http://rforge.net/doc/packages/iotools/hadoop.html] function for
+[hmr](http://rforge.net/doc/packages/iotools/hadoop.html) function for
 the documentation.
