@@ -5,8 +5,7 @@ hpath <- function(path) structure(path, class="HDFSpath")
   if (ncol(y) == 1L) y[, 1] else y
 }
 
-# FIXME: we could use .default.formatter except that it's hidden - we should export it and document it
-hinput <- function(path, formatter=function(x) { y <- mstrsplit(x, '|', '\t'); if (ncol(y) == 1L) y[,1] else y })
+hinput <- function(path, formatter=.default.formatter)
   structure(path, class=c("hinput", "HDFSpath"), formatter=formatter)
 
 .hadoop.detect <- function() {
@@ -46,7 +45,7 @@ c.hinput = function(..., recursive = FALSE) {
 }
 
 hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, formatter, packages=loadedNamespaces(), reducers,
-                remote, wait=TRUE, hadoop.conf, hadoop.opt, R="R") {
+                remote, wait=TRUE, hadoop.conf, hadoop.opt, R="R", log.file) {
   .rn <- function(n) paste(sprintf("%04x", as.integer(runif(n, 0, 65536))), collapse='')
   if (missing(output)) output <- hpath(sprintf("/tmp/io-hmr-temp-%d-%s", Sys.getpid(), .rn(4)))
   if (missing(job.name)) job.name <- sprintf("RCloud:iotools:hmr-%s", .rn(2))
@@ -71,6 +70,7 @@ hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, for
     if (!length(sj)) 
       stop("Cannot find streaming JAR - set HADOOP_STREAMING_JAR or make sure you have a complete Hadoop installation")
   }
+  if (!missing(log.file)) log_cmd = paste0(" &> ", log.file) else log_cmd = ""
   
   e <- new.env(parent=emptyenv())
   if (!missing(aux)) {
@@ -110,7 +110,7 @@ hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, for
   if (!missing(hadoop.conf)) cfg <- paste("--config", shQuote(hadoop.conf)[1L])
   if (missing(remote)) {
     h0 <- paste(shQuote(hcmd), cfg, "jar", shQuote(sj[1L]))
-    cmd <- paste(h0, hargs)
+    cmd <- paste(h0, hargs, log_cmd)
     system(cmd, wait=wait)
   } else {
     if (is.character(remote)) {
