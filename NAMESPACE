@@ -1,2 +1,2 @@
-useDynLib(iotools, stdin_read, stdout_writeBin, mat_split, create_chunk_reader, chunk_read, ctapply_, C_setuser, C_setTempDir, chunk_apply, chunk_tapply, pass, which_min_key)
-export(readSTDIN, mstrsplit, chunk.reader, read.chunk, hmr, hpath, hinput, c.hinput, ctapply, set.user, set.tempdir, chunk.apply, chunk.tapply, which.min.key, line.merge, open.HDFSpath, print.HDFSpath)
+useDynLib(iotools, stdin_read, stdout_writeBin, mat_split, df_split, create_chunk_reader, chunk_read, ctapply_, C_setuser, C_setTempDir, chunk_apply, chunk_tapply, pass, which_min_key)
+export(readSTDIN, mstrsplit, dstrsplit, rowindex, .default.formatter, chunk.reader, read.chunk, hmr, hpath, hinput, c.hinput, ctapply, set.user, set.tempdir, chunk.apply, chunk.tapply, which.min.key, line.merge, open.HDFSpath, print.HDFSpath)
