@@ -7,14 +7,10 @@
 \description{
   \code{dstrsplit} takes a character vector and splits it
   into a dataframe according to the separators.
-
-  \code{rowindex} extracts index vector from a dataframe
-  constructed using dstrsplit.
 }
 \usage{
 dstrsplit(x, col_types, sep="|", nsep=NA, strict=TRUE)
 
-rowindex(df)
 }
 \arguments{
   \item{x}{character vector (each element is treated as a row)}
@@ -30,7 +26,6 @@ rowindex(df)
   \item{strict}{logical, if \code{FALSE} then \code{mstrsplit} will not
     fail on parsing errors, otherwise input not matching the format
     (e.g. more columns than expected) will cause an error.}
-  \item{df}{dataframe from which to extract rowindex values}
 }
 \details{
   If \code{nsep} is specified then all characters up to (but excluding)
@@ -45,21 +40,19 @@ rowindex(df)
   \code{nsep} in which case the first field is treated as a row name and
   subsequent fields as data columns.
 
-  The output of \code{dstrsplit} contains a hidden attribute containing
-  the row index. This is used instead of the rownames to allow for duplicated
-  indicies (which are checked for and not allowed in a dataframe).
+  If \code{nsep} is specified, the output of \code{dstrsplit} contains
+  an extra column called 'rowindex' containing the row index. This is
+  used instead of the rownames to allow for duplicated indicies (which
+  are checked for and not allowed in a dataframe, unlike the case with
+  a matrix).
 }
 \value{
   \code{dstrsplit} returns a Dataframe with as many rows as
   they are lines in the input and as many columns as there are
-  non-NA values in \code{col_types}. The colnames are set to
-  'V' concatenated with the column number; rownames are a
-  sequence of integers from 1 to the number of rows.
-
-  \code{rowindex} returns a character vector with length equal
-  to the number of rows in the input dataframe, which gives the
-  rowindex extracted from dstrsplit. Will be empty strings if
-  no \code{nsep} was supplied.   
+  non-NA values in \code{col_types}, plus an additiona column if
+  \code{nsep} is specified. The colnames (other than the row index)
+  are set to 'V' concatenated with the column number; rownames are
+  a sequence of integers from 1 to the number of rows.
 }
 \author{
   Taylor Arnold and Simon Urbanek
@@ -69,7 +62,6 @@ input = c("apple\t2|2.7|horse|3", "pear\t7|3.4|bear|-3", "pear\t2|1.8|bat|1")
 z = dstrsplit(x = input, col_types = c("integer", "numeric", "character", "integer"),
               sep="|", nsep="\t")
 z
-rowindex(z)
 
 # Ignoring the third column:
 z = dstrsplit(x = input, col_types = c("integer", "numeric", NA, "integer"),

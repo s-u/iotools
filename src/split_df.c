@@ -9,7 +9,7 @@
 
 SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol, SEXP sColTypesCd) {
   char sep;
-  int nsep, use_ncol, resilient, ncol, i, j, k, len;
+  int nsep, use_ncol, resilient, ncol, i, j, k, len, nmsep_flag;
   int * col_types;
   unsigned int nrow;
   char num_buf[48];
@@ -19,7 +19,6 @@ SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol, SE
   SEXP sOutput;
   SEXP * sOutputElem;
   SEXP sOutputRowNames;
-  SEXP sOutputRowIndex;
   SEXP sOutputNames;
   SEXP sOutputClass;
   SEXP sIndexSymbol;
@@ -33,6 +32,7 @@ SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol, SE
   if (TYPEOF(sNamesSep) == STRSXP && LENGTH(sNamesSep) > 0)
     nsep = (int) (unsigned char) *CHAR(STRING_ELT(sNamesSep, 0));
   else nsep = -1;
+  nmsep_flag = (nsep > 0);
   use_ncol = asInteger(sNcol);
   resilient = asInteger(sResilient);
   ncol = use_ncol;
@@ -42,12 +42,15 @@ SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol, SE
 
   PROTECT(sOutputNames = allocVector(STRSXP, ncol));
   PROTECT(sOutputRowNames = allocVector(STRSXP, nrow));
-  if (nsep > 0) PROTECT(sOutputRowIndex = allocVector(STRSXP, nrow));
 
   // Create standard names and row.names for the output dataframe:
   sOutputElem = malloc(ncol * sizeof(SEXP));
-  for (j = 0; j < ncol; j++) {
-    sprintf(buff, "V%d", j+1);
+  if (nmsep_flag) {
+    sprintf(buff, "rowindex");
+    SET_STRING_ELT(sOutputNames, j, mkChar(buff));
+  }
+  for (j = nmsep_flag; j < ncol; j++) {
+    sprintf(buff, "V%d", j+(1-nmsep_flag));
     SET_STRING_ELT(sOutputNames, j, mkChar(buff));
   }
   for (i = 0; i < nrow; i++) {
@@ -84,18 +87,18 @@ SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol, SE
   // Cycle through the rows and extract the data
   for (k = 0; k < nrow; k++) {
     const char *l = CHAR(STRING_ELT(s, k));
-    if (nsep > 0) {
+    if (nmsep_flag) {
       c = strchr(l, nsep);
       if (c) {
-        SET_STRING_ELT(sOutputRowIndex, k, Rf_mkCharLen(l, c - l));
+        SET_STRING_ELT(sOutputElem[0], k, Rf_mkCharLen(l, c - l));
         l = c + 1;
       } else {
-        SET_STRING_ELT(sOutputRowIndex, k, sZerochar);
+        SET_STRING_ELT(sOutputElem[0], k, sZerochar);
       }
     }
 
-    i = 0;
-    j = 0;
+    i = nmsep_flag;
+    j = nmsep_flag;
     while ((c = strchr(l, sep))) {
       if (i >= use_ncol - 1) {
         if (resilient) break;
@@ -173,10 +176,9 @@ SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol, SE
   classgets(sOutput, sOutputClass);
 
   setAttrib(sOutput, R_RowNamesSymbol, sOutputRowNames);
-  if (nsep >0) setAttrib(sOutput, sIndexSymbol, sOutputRowIndex);
   setAttrib(sOutput, R_NamesSymbol, sOutputNames);
 
-  UNPROTECT(5 + ncol + (nsep > 0));
+  UNPROTECT(5 + ncol);
   free(sOutputElem); // allocated array of SEXPs
   return(sOutput);
 }
