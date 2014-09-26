@@ -14,7 +14,7 @@ hinput <- function(path, formatter=.default.formatter)
   if (!nzchar(hh)) hh <- "/usr/lib/hadoop"
   hcmd <- file.path(hh, "bin", "hadoop")
   if (!file.exists(hcmd)) stop("Cannot find working Hadoop home. Set HADOOP_PREFIX if in doubt.")
-  
+
   sj <- Sys.getenv("HADOOP_STREAMING_JAR")
   if (!nzchar(sj)) sj <- Sys.glob(file.path(hh, "contrib", "streaming", "*.jar"))
   if (!length(sj)) {
@@ -28,7 +28,7 @@ hinput <- function(path, formatter=.default.formatter)
     }
   }
   list(hh=hh, hcmd=hcmd, sj=sj)
-}  
+}
 
 c.hinput = function(..., recursive = FALSE) {
   if(!all(sapply(list(...), function(v) all.equal(attr(v, "class"), c("hinput", "HDFSpath"))) == TRUE)) {
@@ -45,7 +45,7 @@ c.hinput = function(..., recursive = FALSE) {
 }
 
 hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, formatter, packages=loadedNamespaces(), reducers,
-                remote, wait=TRUE, hadoop.conf, hadoop.opt, R="R", log.file) {
+                remote, wait=TRUE, hadoop.conf, hadoop.opt, R="R", verbose=TRUE) {
   .rn <- function(n) paste(sprintf("%04x", as.integer(runif(n, 0, 65536))), collapse='')
   if (missing(output)) output <- hpath(sprintf("/tmp/io-hmr-temp-%d-%s", Sys.getpid(), .rn(4)))
   if (missing(job.name)) job.name <- sprintf("RCloud:iotools:hmr-%s", .rn(2))
@@ -62,16 +62,15 @@ hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, for
   if (is.null(map.formatter)) map.formatter <- .default.formatter
   if (is.null(red.formatter)) red.formatter <- .default.formatter
 
-  if (missing(remote)) { 
+  if (missing(remote)) {
     h <- .hadoop.detect()
     hh <- h$hh
     hcmd <- h$hcmd
     sj <- h$sj
-    if (!length(sj)) 
+    if (!length(sj))
       stop("Cannot find streaming JAR - set HADOOP_STREAMING_JAR or make sure you have a complete Hadoop installation")
   }
-  if (!missing(log.file)) log_cmd = paste0(" &> ", log.file) else log_cmd = ""
-  
+
   e <- new.env(parent=emptyenv())
   if (!missing(aux)) {
     if (is.list(aux)) for (n in names(aux)) e[[n]] <- aux[[n]]
@@ -98,7 +97,7 @@ hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, for
     else
       paste(extraD, paste("-D", shQuote(paste0(hon, "=", as.character(hadoop.opt))), collapse=" "))
   }
-    
+
   hargs <- paste(
                "-D", "mapreduce.reduce.input.limit=-1",
                "-D", shQuote(paste0("mapred.job.name=", job.name)), extraD,
@@ -110,8 +109,8 @@ hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, for
   if (!missing(hadoop.conf)) cfg <- paste("--config", shQuote(hadoop.conf)[1L])
   if (missing(remote)) {
     h0 <- paste(shQuote(hcmd), cfg, "jar", shQuote(sj[1L]))
-    cmd <- paste(h0, hargs, log_cmd)
-    system(cmd, wait=wait)
+    cmd <- paste(h0, hargs)
+    system(cmd, wait=wait, ignore.stdout = !verbose, ignore.stderr = !verbose)
   } else {
     if (is.character(remote)) {
       auth.user <- NULL
@@ -142,7 +141,7 @@ hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, for
         on.exit(RSclient::RS.close(remote))
         if (!is.null(auth.user))
           RSclient::RS.login(remote, auth.user, auth.pwd, authkey=RSclient::RS.authkey())
-      }    
+      }
     }
     if (!inherits(remote, "RserveConnection"))
       stop("remote must be an RserveConnection or a string denoting a server to connect to")
@@ -163,7 +162,7 @@ hmr <- function(input, output, map=identity, reduce=identity, job.name, aux, for
   hargs <- args$hargs
 
   h <- .hadoop.detect()
-  if (!length(h$sj)) 
+  if (!length(h$sj))
     stop("Cannot find streaming JAR - set HADOOP_STREAMING_JAR or make sure you have a complete Hadoop installation")
   h0 <- paste(shQuote(h$hcmd), args$hcfg, "jar", shQuote(h$sj[1L]))
   cmd <- paste(h0, hargs)
