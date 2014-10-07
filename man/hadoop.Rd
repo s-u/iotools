@@ -16,7 +16,7 @@
 hmr(input, output, map = identity, reduce = identity, job.name,
     aux, formatter, packages = loadedNamespaces(), reducers,
     remote, wait=TRUE, hadoop.conf, hadoop.opt, R="R",
-    verbose = TRUE)
+    verbose = TRUE, persistent = FALSE)
 hpath(path)
 hinput(path, formatter = .default.formatter)
 }
@@ -53,7 +53,10 @@ hinput(path, formatter = .default.formatter)
     specific and thus not prtable across systems.}
   \item{R}{command to call to run R on the Hadoop cluster}
   \item{verbose}{logical, indicating whether the output sent to standard
-  error and standard out from hadoop should be printed to the console.}
+    error and standard out from hadoop should be printed to the console.}
+  \item{persistent}{logical, if \code{TRUE} then an ROctopus job is
+    started and the mapper is executed in "hot" ROctopus instances
+    instead of regular R. The results in that case are ROctopus URLs.}
   \item{path}{HDFS path}
 }
 \details{

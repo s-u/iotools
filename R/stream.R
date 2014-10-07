@@ -10,6 +10,28 @@ as.output.table <- function(x) paste(names(x), x, sep='\t')
 as.output.matrix <- function(x) { o <- apply(x, 1, paste, collapse='|'); if (!is.null(rownames(x))) o <- paste(rownames(x), o, sep='\t'); o }
 as.output.list <- function(x) paste(names(x), sapply(x, function (e) paste(as.character(e), collapse='|')), sep='\t')
 
+## this is almost like run.chunked() except for passing it to the worker
+run.persistent <- function(FUN, formatter=mstrsplit, key.sep=NULL) {
+  wd <- getwd()
+  load("stream.RData", .GlobalEnv)
+  ## if (!is.null(.GlobalEnv$load.packages)) try(for(i in .GlobalEnv$load.packages) require(i, quietly=TRUE, character.only=TRUE), silent=TRUE)
+  input <- file("stdin", "rb")
+  output <- stdout()
+  reader <- chunk.reader(input, sep=key.sep)
+  ws <- character()
+  while (TRUE) {
+     chunk <- read.chunk(reader)
+     if (!length(chunk)) break
+     c <- .ro.new()
+     ws <- c(ws, attr(c, "url"))
+     tryCatch(RSclient::RS.eval(c, bquote(iotools:::.ro.chunk(.(wd), .(FUN), .(chunk), .(formatter))), wait=FALSE, lazy=FALSE),
+              error=function(...) NULL)
+     tryCatch(RSclient::RS.close(c), error=function(...) NULL)
+   }
+  writeLines(ws)
+  invisible(TRUE)
+}
+
 run.chunked <- function(FUN, formatter=mstrsplit, key.sep=NULL) {
   ## we have to load stream.RData first since it actually contains FUN (thank you lazy evaluation - the only reason why this works at all)
   load("stream.RData", .GlobalEnv)
@@ -62,6 +84,7 @@ run.chunked <- function(FUN, formatter=mstrsplit, key.sep=NULL) {
 
 run.map <- function() run.chunked(.GlobalEnv$map, .GlobalEnv$map.formatter)
 run.reduce <- function() run.chunked(.GlobalEnv$reduce, .GlobalEnv$red.formatter, "\t")
+run.ro <- function() run.persistent(.GlobalEnv$map, .GlobalEnv$map.formatter)
 
 chunk.apply <- function(input, FUN, ..., CH.MERGE=rbind, CH.MAX.SIZE=33554432) {
   if (!inherits(inherits, "ChunkReader"))
