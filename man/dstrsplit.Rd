@@ -5,7 +5,7 @@
   Split ASCII input into a dataframe
 }
 \description{
-  \code{dstrsplit} takes a character vector and splits it
+  \code{dstrsplit} takes raw or character vector and splits it
   into a dataframe according to the separators.
 }
 \usage{
@@ -13,9 +13,12 @@ dstrsplit(x, col_types, sep="|", nsep=NA, strict=TRUE)
 
 }
 \arguments{
-  \item{x}{character vector (each element is treated as a row)}
-  \item{col_types}{required character. A vector of classes to be
-  assumed for the output dataframe. Will not be recycled, and must
+  \item{x}{character vector (each element is treated as a row) or a
+  raw vector (newlines separate rows)}
+  \item{col_types}{required character vector or a list. A vector of
+  classes to be assumed for the output dataframe. If it is a list,
+  \code{class(x)[1]} will be used to determine the class of the
+  contained element. It will not be recycled, and must
   be at least as long as the longest row if \code{strict} is \code{TRUE}.
 
   Possible values are 'integer', 'numeric', 'character', and NA. The
@@ -23,7 +26,7 @@ dstrsplit(x, col_types, sep="|", nsep=NA, strict=TRUE)
   \item{sep}{single character: field (column) separator}
   \item{nsep}{index name separator (single character) or \code{NA} if no
     index names are included}
-  \item{strict}{logical, if \code{FALSE} then \code{mstrsplit} will not
+  \item{strict}{logical, if \code{FALSE} then \code{dstrsplit} will not
     fail on parsing errors, otherwise input not matching the format
     (e.g. more columns than expected) will cause an error.}
 }
@@ -47,12 +50,13 @@ dstrsplit(x, col_types, sep="|", nsep=NA, strict=TRUE)
   a matrix).
 }
 \value{
-  \code{dstrsplit} returns a Dataframe with as many rows as
+  \code{dstrsplit} returns a data.frame with as many rows as
   they are lines in the input and as many columns as there are
-  non-NA values in \code{col_types}, plus an additiona column if
+  non-NA values in \code{col_types}, plus an additional column if
   \code{nsep} is specified. The colnames (other than the row index)
-  are set to 'V' concatenated with the column number; rownames are
-  a sequence of integers from 1 to the number of rows.
+  are set to 'V' concatenated with the column number unless
+  \code{col_types} is a named vector in which case the names are
+  inherited.
 }
 \author{
   Taylor Arnold and Simon Urbanek

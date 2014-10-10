@@ -16,21 +16,19 @@ static long count_lines(SEXP sRaw) {
 	c++;
     }
     if (e > c && e[-1] != '\n') lines++;
-    printf("found %ld lines\n", lines);
     return lines;
 }
 
-SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol, SEXP sColTypesCd) {
+SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
+	      SEXP sColTypesCd, SEXP sColNames) {
     char sep;
     int nsep, use_ncol, resilient, ncol, i, j, k, len, nmsep_flag;
     int * col_types;
     unsigned int nrow;
     char num_buf[48];
     const char *c, *sraw, *send;
-    char buff[20];
 
-    SEXP sOutput, tmp;
-    SEXP sOutputNames;
+    SEXP sOutput, tmp, sOutputNames;
     SEXP sZerochar;
 
     sZerochar = PROTECT(mkChar(""));
@@ -49,7 +47,7 @@ SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol, SE
     
     /* count non-NA columns */
     for (i = 0; i < use_ncol; i++)
-	if(col_types[i] == NA_CD) ncol--;
+	if (col_types[i] == NA_CD) ncol--;
 
     /* check input */
     if (TYPEOF(s) == RAWSXP) {
@@ -77,20 +75,12 @@ SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol, SE
     /* set class */
     classgets(sOutput, mkString("data.frame"));
     
-    // Create standard names and row.names for the output dataframe:
-    if (nmsep_flag) {
-	SET_STRING_ELT(sOutputNames, 0, mkChar("rowindex"));
-	SET_VECTOR_ELT(sOutput, 0, allocVector(STRSXP, nrow));
-    }
-  
-    for (j = nmsep_flag; j < ncol; j++) {
-	snprintf(buff, sizeof(buff), "V%d", j + (1 - nmsep_flag));
-	SET_STRING_ELT(sOutputNames, j, mkChar(buff));
-    }
-
-    // Create SEXP for each element of the output:
+    /* Create SEXP for each element of the output */
     j = 0;
     for (i = 0; i < use_ncol; i++) {
+	if (col_types[i] != NA_CD) /* copy col.name */
+	    SET_STRING_ELT(sOutputNames, j, STRING_ELT(sColNames, i));
+
 	switch (col_types[i]) {
 	case INTEGER_CD:
 	    SET_VECTOR_ELT(sOutput, j++, allocVector(INTSXP, nrow));
@@ -105,7 +95,6 @@ SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol, SE
 	    break;
 	}
     }
-    printf("prepared %d columns (expected %d out of %d)\n", j, ncol, use_ncol);
 
     // Cycle through the rows and extract the data
     for (k = 0; k < nrow; k++) {

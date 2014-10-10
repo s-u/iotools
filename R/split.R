@@ -5,9 +5,16 @@ mstrsplit <- function(x, sep="|", nsep=NA, line=1L, strict=TRUE, ncol = NA,
 }
 
 dstrsplit <- function(x, col_types, sep="|", nsep=NA, strict=TRUE) {
-  if (!is.na(nsep)) col_types = c("character", col_types);
-  ncol = length(col_types)
+  if (is.null(col.names <- names(col_types)))
+    col.names <- paste0("V", seq_along(col_types))
+  if (is.list(col_types))
+    col_types <- sapply(col_types, function(o) if (any(is.na(o))) NA else class(o)[1L])
+  if (!is.na(nsep)) {
+    col_types <- c("character", col_types);
+    col.names <- c("rowindex", col.names)
+  }
+  ncol <- length(col_types)
   col_types_cd = match(col_types, c("integer", "numeric", "character", NA)) - 1L
   if(any(is.na(col_types_cd))) stop("Invalid column types")
-  .Call(df_split, x, sep, nsep, !strict, ncol, col_types_cd)
+  .Call(df_split, x, sep, nsep, !strict, ncol, col_types_cd, col.names)
 }
