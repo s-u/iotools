@@ -14,7 +14,7 @@ dstrsplit <- function(x, col_types, sep="|", nsep=NA, strict=TRUE) {
     col.names <- c("rowindex", col.names)
   }
   ncol <- length(col_types)
-  col_types_cd = match(col_types, c("integer", "numeric", "character", NA)) - 1L
+  col_types_cd = match(col_types, c("integer", "numeric", "character", "POSIXct", NA)) - 1L
   if(any(is.na(col_types_cd))) stop("Invalid column types")
   .Call(df_split, x, sep, nsep, !strict, ncol, col_types_cd, col.names)
 }

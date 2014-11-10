@@ -21,8 +21,13 @@ dstrsplit(x, col_types, sep="|", nsep=NA, strict=TRUE)
   contained element. It will not be recycled, and must
   be at least as long as the longest row if \code{strict} is \code{TRUE}.
 
-  Possible values are 'integer', 'numeric', 'character', and NA. The
-  latter indicates that the column should be skipped in the output.}
+  Possible values are 'integer', 'numeric', 'character', 'POSIXct' and NA.
+  The latter indicates that the column should be skipped in the output.
+  'POSIXct' will parse date format in the form "YYYY-MM-DD hh:mm:ss.sss"
+  assuming GMT time zone. The separators between digits can be any
+  non-digit characters and only the date part is mandatory. See also
+  \code{fasttime::asPOSIXct} for details.
+  }
   \item{sep}{single character: field (column) separator}
   \item{nsep}{index name separator (single character) or \code{NA} if no
     index names are included}

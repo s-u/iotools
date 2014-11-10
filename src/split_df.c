@@ -2,10 +2,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* from tparse.c (which is based on code form fasttime) */
+double parse_ts(const char *c_start, const char *c_end);
+
 #define INTEGER_CD 0
 #define NUMERIC_CD 1
 #define CHAR_CD    2
-#define NA_CD      3
+#define TS_CD      3
+#define NA_CD      4
 
 static long count_lines(SEXP sRaw) {
     const char *c = (const char*) RAW(sRaw);
@@ -86,6 +90,23 @@ SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
 	    SET_VECTOR_ELT(sOutput, j++, allocVector(INTSXP, nrow));
 	    break;
 	    
+	case TS_CD:
+	    {
+		SEXP st, clv;
+		SET_VECTOR_ELT(sOutput, j++, st = allocVector(REALSXP, nrow));
+		clv = PROTECT(allocVector(STRSXP, 2));
+		SET_STRING_ELT(clv, 0, mkChar("POSIXct"));
+		SET_STRING_ELT(clv, 1, mkChar("POSIXt"));
+		setAttrib(st, R_ClassSymbol, clv);
+		/* this is somewhat a security precaution such that users
+		   don't get surprised -- if there is no TZ R will
+		   render it in local time - which is correct but
+		   may confuse people that didn't use GMT to start with */
+		setAttrib(st, install("tzone"), mkString("GMT"));
+		UNPROTECT(1);
+		break;
+	    }
+
 	case NUMERIC_CD:
 	    SET_VECTOR_ELT(sOutput, j++, allocVector(REALSXP, nrow));
 	    break;
@@ -134,6 +155,10 @@ SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
 		j++;
 		break;
 		
+	    case TS_CD:
+		REAL(VECTOR_ELT(sOutput, j++))[k] = parse_ts(l, c);
+		break;
+		
 	    case NUMERIC_CD:
 		len = (int) (c - l);
 		/* watch for overflow and truncate -- should we warn? */
@@ -163,6 +188,7 @@ SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
 		break;
 		
 	    case NUMERIC_CD:
+	    case TS_CD:
 		REAL(VECTOR_ELT(sOutput, j++))[k] = NA_REAL;
 		break;
 		
