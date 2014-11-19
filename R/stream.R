@@ -88,7 +88,7 @@ run.reduce <- function() run.chunked(.GlobalEnv$reduce, .GlobalEnv$red.formatter
 run.ro <- function() run.persistent(.GlobalEnv$map, .GlobalEnv$map.formatter)
 
 chunk.apply <- function(input, FUN, ..., CH.MERGE=rbind, CH.MAX.SIZE=33554432) {
-  if (!inherits(inherits, "ChunkReader"))
+  if (!inherits(input, "ChunkReader"))
     reader <- chunk.reader(input)
   .Call(chunk_apply, reader, CH.MAX.SIZE, CH.MERGE, FUN, parent.frame(), .External(pass, ...))
 }
