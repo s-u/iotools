@@ -132,7 +132,11 @@ mc.chunk.apply = function(input, FUN, ..., CH.MERGE, CH.MAX.SIZE,
     worker_queue[[i]] = mcparallel(FUN(chunk, ...))
   }
   if (length(worker_queue) == 0) return(CH.MERGE(NULL))
-
+ 
+  # If CH.MERGE is list, override it with the correct CH.MERGE function.
+  if (identical(list, CH.MERGE))
+    CH.MERGE = function(x, ...) c(x, list(...))
+    
   # Pre-fetch the next chunk if we not at the end of input.
   if (length(chunk) > 0) chunk = read.chunk(reader)
 
