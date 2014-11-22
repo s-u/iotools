@@ -8,7 +8,7 @@
   to each chunk, collecting the results.
 }
 \usage{
-chunk.apply(input, FUN, ..., CH.MERGE = rbind, CH.MAX.SIZE = 33554432)
+chunk.apply(input, FUN, ..., CH.MERGE = rbind, CH.MAX.SIZE = 33554432, parallel=1)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -21,6 +21,7 @@ chunk.apply(input, FUN, ..., CH.MERGE = rbind, CH.MAX.SIZE = 33554432)
   behavior, \code{rbind} for table-like output or \code{c} for a long
   vector.}
   \item{CH.MAX.SIZE}{maximal size of each chunk in bytes}
+  \item{parallel}{number of parallel processes to use (unix only)}
 }
 \note{
   The input to \code{FUN} is the raw chunk, so typically it is
@@ -33,7 +34,7 @@ chunk.apply(input, FUN, ..., CH.MERGE = rbind, CH.MAX.SIZE = 33554432)
 %\references{
 %}
 \author{
- Simon Urbanek
+ Simon Urbanek and Michael Kane
 }
 %\note{
 %}

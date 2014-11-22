@@ -87,10 +87,66 @@ run.map <- function() run.chunked(.GlobalEnv$map, .GlobalEnv$map.formatter)
 run.reduce <- function() run.chunked(.GlobalEnv$reduce, .GlobalEnv$red.formatter, "\t")
 run.ro <- function() run.persistent(.GlobalEnv$map, .GlobalEnv$map.formatter)
 
-chunk.apply <- function(input, FUN, ..., CH.MERGE=rbind, CH.MAX.SIZE=33554432) {
+chunk.apply <- function(input, FUN, ..., CH.MERGE=rbind, CH.MAX.SIZE=33554432,
+                        parallel=1) {
+  if (parallel < 1)
+    stop("You must specify a postive integer number of parallel processes")
+  if (parallel == 1) 
+    return(seq.chunk.apply(input, FUN, ..., CH.MERGE, CH.MAX.SIZE))
+  # Multiple processes have been specified.
+  if (.Platform$OS.type != "unix") {
+    warning(paste("Parallel chunk.apply only work on unix platforms.",
+                  "Running sequentially"))
+    return(seq.chunk.apply(input, FUN, ..., CH.MERGE, CH.MAX.SIZE))
+  }
+  mc.chunk.apply(input, FUN, ..., CH.MERGE, CH.MAX.SIZE, parallel)
+}
+
+seq.chunk.apply <- function(input, FUN, ..., CH.MERGE=rbind, 
+                            CH.MAX.SIZE=33554432) {
   if (!inherits(input, "ChunkReader"))
     reader <- chunk.reader(input)
   .Call(chunk_apply, reader, CH.MAX.SIZE, CH.MERGE, FUN, parent.frame(), .External(pass, ...))
+}
+
+mc.chunk.apply = function(input, FUN, ..., CH.MERGE=rbind, 
+                          CH.MAX.SIZE= 33554432, 
+                          mc.cores=getOption("mc.cores", 2L)) {
+  require(parallel)
+  if (!inherits(input, "ChunkReader"))
+    reader = chunk.reader(input)
+  if (mc.cores == 1) {
+    warning("Only 1 core specified, calling chunk.apply")
+    return(chunk.apply(input, FUN, ..., CH.MERGE, CH.MAX.SIZE))
+  }
+  worker_queue = list()
+
+  # Fill the worker queue.
+  for (i in 1:max(mc.cores-1, 1)) {
+    chunk = read.chunk(reader)
+    if (length(chunk) == 0) {
+      break
+    }
+    worker_queue[[i]] = mcparallel(FUN(chunk, ...))
+  }
+  if (length(worker_queue) == 0) return(CH.MERGE(NULL))
+
+  # Pre-fetch the next chunk if we not at the end of input.
+  if (length(chunk) > 0) chunk = read.chunk(reader)
+
+  # Process the chunk-stream.
+  done = FALSE
+  ret = NULL
+  while (!done) {
+    ret = CH.MERGE(ret, mccollect(worker_queue[[1]])[[1]])
+    worker_queue[1] = NULL
+    if (length(chunk) > 0) {
+      worker_queue[[length(worker_queue)+1]] = mcparallel(FUN(chunk, ...))
+      chunk = read.chunk(reader)
+    }
+    if (length(worker_queue) == 0) done = TRUE
+  }
+  ret
 }
 
 chunk.tapply <- function(input, FUN, ..., sep='\t', CH.MERGE=rbind, CH.MAX.SIZE=33554432) {
