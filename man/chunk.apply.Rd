@@ -8,7 +8,8 @@
   to each chunk, collecting the results.
 }
 \usage{
-chunk.apply(input, FUN, ..., CH.MERGE = rbind, CH.MAX.SIZE = 33554432, parallel=1)
+chunk.apply(input, FUN, ..., CH.MERGE = rbind, CH.MAX.SIZE = 33554432, 
+            parallel=1)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
