@@ -92,26 +92,28 @@ chunk.apply <- function(input, FUN, ..., CH.MERGE=rbind, CH.MAX.SIZE=33554432,
   if (parallel < 1)
     stop("You must specify a postive integer number of parallel processes")
   if (parallel == 1) 
-    return(seq.chunk.apply(input, FUN, ..., CH.MERGE, CH.MAX.SIZE))
+    return(seq.chunk.apply(input, FUN, ..., CH.MERGE=CH.MERGE, 
+                           CH.MAX.SIZE=CH.MAX.SIZE, frame=parent.frame()))
   # Multiple processes have been specified.
   if (.Platform$OS.type != "unix") {
     warning(paste("Parallel chunk.apply only work on unix platforms.",
                   "Running sequentially"))
-    return(seq.chunk.apply(input, FUN, ..., CH.MERGE, CH.MAX.SIZE))
+    return(seq.chunk.apply(input, FUN, ..., CH.MERGE=CH.MERGE, 
+                           CH.MAX.SIZE=CH.MAX.SIZE, frame=parent.frame()))
   }
-  mc.chunk.apply(input, FUN, ..., CH.MERGE, CH.MAX.SIZE, parallel)
+  mc.chunk.apply(input, FUN, ..., CH.MERGE=CH.MERGE, 
+                 CH.MAX.SIZE=CH.MAX.SIZE, mc.cores=parallel)
 }
 
-seq.chunk.apply <- function(input, FUN, ..., CH.MERGE=rbind, 
-                            CH.MAX.SIZE=33554432) {
+seq.chunk.apply <- function(input, FUN, ..., CH.MERGE, CH.MAX.SIZE, frame) {
   if (!inherits(input, "ChunkReader"))
     reader <- chunk.reader(input)
-  .Call(chunk_apply, reader, CH.MAX.SIZE, CH.MERGE, FUN, parent.frame(), .External(pass, ...))
+  .Call(chunk_apply, reader, CH.MAX.SIZE, CH.MERGE, FUN, frame, 
+        .External(pass, ...))
 }
 
-mc.chunk.apply = function(input, FUN, ..., CH.MERGE=rbind, 
-                          CH.MAX.SIZE= 33554432, 
-                          mc.cores=getOption("mc.cores", 2L)) {
+mc.chunk.apply = function(input, FUN, ..., CH.MERGE, CH.MAX.SIZE, 
+                          mc.cores) {
   require(parallel)
   if (!inherits(input, "ChunkReader"))
     reader = chunk.reader(input)
