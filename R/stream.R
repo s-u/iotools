@@ -96,8 +96,6 @@ chunk.apply <- function(input, FUN, ..., CH.MERGE=rbind, CH.MAX.SIZE=33554432,
                            CH.MAX.SIZE=CH.MAX.SIZE, frame=parent.frame()))
   # Multiple processes have been specified.
   if (.Platform$OS.type != "unix") {
-    warning(paste("Parallel chunk.apply only work on unix platforms.",
-                  "Running sequentially"))
     return(seq.chunk.apply(input, FUN, ..., CH.MERGE=CH.MERGE, 
                            CH.MAX.SIZE=CH.MAX.SIZE, frame=parent.frame()))
   }
