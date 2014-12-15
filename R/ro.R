@@ -38,7 +38,8 @@
 
 ## create a new worker
 .ro.new <- function() {
-  sock <- path.expand("~/rserve.sock") # paste0("/tmp/",Sys.getenv("USER"),"-rserve.sock") 
+  sock <- file.path(unixtools:::user.info()[,"home"], "rserve.sock")
+  #sock <- path.expand("~/rserve.sock") # paste0("/tmp/",Sys.getenv("USER"),"-rserve.sock") 
   c <- tryCatch(RSclient::RS.connect(sock, 0L), error=function(e) {
     Rserve::Rserve(args=c("--RS-socket", sock, "--no-save"))
     if (!file.exists(sock)) Sys.sleep(0.2)
