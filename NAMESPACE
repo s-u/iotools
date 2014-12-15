@@ -1,4 +1,2 @@
 useDynLib(iotools, stdin_read, stdout_writeBin, mat_split, df_split, df_split_fw, create_chunk_reader, chunk_read, ctapply_, chunk_apply, chunk_tapply, pass, which_min_key)
-export(readSTDIN, mstrsplit, dstrsplit, dstrfw, .default.formatter, chunk.reader, read.chunk, hmr, hpath, hinput, c.hinput, ctapply, chunk.apply, chunk.tapply, which.min.key, line.merge, open.HDFSpath, print.HDFSpath, as.output, as.output.data.frame, as.output.table, as.output.matrix, as.output.list)
-## for ROctopus commands - experimental, obviously
-exportPattern("^w.*")
+export(mstrsplit, dstrsplit, dstrfw, chunk.reader, read.chunk, ctapply, chunk.apply, chunk.tapply, which.min.key, line.merge)
