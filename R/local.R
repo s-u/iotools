@@ -4,7 +4,7 @@ input <- function(file, formatter = .default.formatter, max.line = 65536L) {
   if (is.character(file)) {
     input = file(file, "rb")
     on.exit(close(input))
-  } else if (is.connection(file)) {
+  } else if (inherits(f, "connection")) {
     input = file
   } else {
     stop("'file' must be a connection or a character string to a file path.")
