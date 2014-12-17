@@ -39,5 +39,10 @@ dstrfw <- function(x, col_types, widths, nsep=NA, strict=TRUE) {
   if(any(is.na(col_types_cd))) stop("Invalid column types")
   .Call(df_split_fw, x, as.integer(widths), nsep, !strict, ncol,
           col_types_cd, col.names)
-
 }
+
+.default.formatter <- function(x) {
+    y <- mstrsplit(x, "|", "\t")
+      if (ncol(y) == 1L) y[, 1] else y
+}
+

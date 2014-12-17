@@ -1,16 +1,15 @@
 \name{.default.formatter}
 \alias{.default.formatter}
 \title{
-  Default formatter for hmr
+  Default formatter, coorisponding to the as.output functions
 }
 \description{
   This function provides the default formatter for the
-  \code{\link{hmr}} function; it assumes that the key is
+  iotools package; it assumes that the key is
   seperated from the rest of the row by a tab character,
   and the elements of the row are seperated by the pipe
   ("|") character. Vector and matrix objects returned from
-  the output of a map or reduce step in \code{\link{hmr}}
-  should be directly readable by \code{\link{.default.formatter}}.
+  the output via \code{\link{as.output}}.
 }
 \usage{
 .default.formatter(x)
