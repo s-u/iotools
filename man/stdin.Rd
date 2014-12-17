@@ -1,17 +1,23 @@
 \name{readSTDIN}
 \alias{readSTDIN}
+\alias{writeBIN}
 \title{
-  Read from stdin
+  Read from stdin, write to stdout
 }
 \description{
-  \code{readSTDIN} reads lines from \code{stdin}
+  \code{readSTDIN} reads lines from \code{stdin}, and
+  \code{writeBIN} writes binary connection to \code{stdout}.
 }
 \usage{
 readSTDIN(n = 10000L)
+
+writeBIN(what, flush=TRUE)
 }
 \arguments{
   \item{n}{integer, number of lines to read at most}
-}
+  \item{what}{raw object to output to stdout}
+  \item{flush}{whether binary output should be flushed}
+}  
 %\details{
 %}
 \value{
