@@ -1,5 +1,6 @@
 \name{chunk.apply}
 \alias{chunk.apply}
+\alias{chunk.tapply}
 \title{
   Process input by applying a function to each chunk
 }
@@ -9,6 +10,8 @@
 }
 \usage{
 chunk.apply(input, FUN, ..., CH.MERGE = rbind, CH.MAX.SIZE = 33554432)
+
+chunk.tapply(input, FUN, ..., sep = "\t", CH.MERGE = rbind, CH.MAX.SIZE = 33554432)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -16,6 +19,9 @@ chunk.apply(input, FUN, ..., CH.MERGE = rbind, CH.MAX.SIZE = 33554432)
   will be used to create a chunk reader}
   \item{FUN}{Function to apply to each chunk}
   \item{\dots}{Additional parameters passed to \code{FUN}}
+  \item{sep}{for tapply, gives separator for the key over which to apply. Each line
+  is split at the first separator, and the value is treated as the key over which
+  to apply the function over.}
   \item{CH.MERGE}{Function to call to merge results from all
   chunks. Common values are \code{list} to get \code{lapply}-like
   behavior, \code{rbind} for table-like output or \code{c} for a long

@@ -4,52 +4,26 @@
 Merge multiple sources
 }
 \description{
-Read lines and merge over multiple connections
+Read lines for a collection of sources and merges the results to a single output.
 }
 \usage{
 line.merge(sources, target, sep = "|", close = TRUE)
 }
 \arguments{
-  \item{sources}{
-connections to merge
-}
-  \item{target}{
-%%     ~~Describe \code{target} here~~
-}
-  \item{sep}{
-%%     ~~Describe \code{sep} here~~
-}
-  \item{close}{
-%%     ~~Describe \code{close} here~~
-}
-}
-\details{
+  \item{sources}{A list or vector of connections which need to be merged}
+  \item{target}{A connection object or a character string giving the output
+  of the merge. If a character string a new file connection will be created
+  with the supplied file name.}
+  \item{sep}{string specifying the key delimiter. Only the first character
+          is used. Can be \code{""} if the entire string is to be treated as
+          a key.}
+  \item{close}{logical. Should the input to sources be closed by the function.}
 }
 \value{
-
-}
-\references{
-%% ~put references to the literature/web site here ~
+  No explicit value is returned. The function is used purely for its side effects
+  on the sources and target.
 }
 \author{
-%%  ~~who you are~~
+ Simon Urbanek
 }
-\note{
-%%  ~~further notes~~
-}
-
-%% ~Make other sections like Warning with \section{Warning }{....} ~
-
-\seealso{
-%% ~~objects to See Also as \code{\link{help}}, ~~~
-}
-\examples{
-##---- Should be DIRECTLY executable !! ----
-##-- ==>  Define data, use random,
-##--	or do  help(data=index)  for the standard data sets.
-
-}
-% Add one or more standard keywords, see file 'KEYWORDS' in the
-% R documentation directory.
-\keyword{ ~kwd1 }
-\keyword{ ~kwd2 }% __ONLY ONE__ keyword per line
+\keyword{ manip }
