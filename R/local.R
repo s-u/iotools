@@ -1,22 +1,15 @@
 # wrappers for using iotools locally; loads input, writes output,
 
-input <- function(file, formatter = .default.formatter, max.line = 65536L) {
-  if (is.character(file)) {
-    input = file(file, "rb")
+input <- function(file_name, formatter = .default.formatter) {
+  if (is.character(file_name)) {
+    input = file(file_name, "rb")
     on.exit(close(input))
-  } else if (inherits(file, "connection")) {
-    input = file
   } else {
-    stop("'file' must be a connection or a character string to a file path.")
+    stop("'file_name' must be a character string to a file path.")
   }
-  reader = chunk.reader(input, max.line=max.line)
-  output = NULL
-  while (TRUE) {
-    chunk = read.chunk(reader)
-    if (!length(chunk)) break
-    output = rbind(output, formatter(chunk))
-  }
-  return(output)
+
+  n = file.info(file_name)$size
+  formatter(readBin(input, what="raw", n=n))
 }
 
 output <- function(x, file, formatter.output = NULL) {
