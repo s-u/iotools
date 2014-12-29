@@ -1,10 +1,16 @@
 mstrsplit <- function(x, sep="|", nsep=NA, line=1L, strict=TRUE, ncol = NA,
                       type=c("character", "numeric")) {
+  if (nchar(sep) != 1L) stop("Seperator must be either NA or a one character value.")
+  if (is.na(sep)) {
+    sep = "\n"
+    ncol = 1L
+  }
   type_flag = as.integer(match.arg(type) == "character")
   .Call(mat_split, x, sep, nsep, line, !strict, ncol, type_flag)
 }
 
 dstrsplit <- function(x, col_types, sep="|", nsep=NA, strict=TRUE) {
+  if (nchar(sep) != 1L) stop("Seperator must be either NA or a one character value.")
   if (is.null(col.names <- names(col_types)))
     col.names <- paste0("V", seq_along(col_types))
   if (is.list(col_types))
@@ -12,6 +18,10 @@ dstrsplit <- function(x, col_types, sep="|", nsep=NA, strict=TRUE) {
   if (!is.na(nsep)) {
     col_types <- c("character", col_types);
     col.names <- c("rowindex", col.names)
+  }
+  if (is.na(sep)) {
+    sep = "\n"
+    ncol = 1L
   }
   ncol <- length(col_types)
   col_types_cd = match(col_types, c("integer", "numeric", "character", "POSIXct", NA)) - 1L

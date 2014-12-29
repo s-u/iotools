@@ -14,7 +14,8 @@ mstrsplit(x, sep = "|", nsep = NA, line = 1L, strict = TRUE, ncol = NA,
 \arguments{
   \item{x}{character vector (each element is treated as a row) or a raw
     vector (LF characters \code{'\n'} separate rows) to split}
-  \item{sep}{single character: field (column) separator}
+  \item{sep}{single character: field (column) separator. Set to \code{NA}
+    for no seperator; in other words, a single column.}
   \item{nsep}{row name separator (single character) or \code{NA} if no
     row names are included}
   \item{line}{line number of the first line - used to identify lines in
@@ -31,7 +32,7 @@ mstrsplit(x, sep = "|", nsep = NA, line = 1L, strict = TRUE, ncol = NA,
   If the input is a raw vector, then it is interpreted as ASCII content
   with LF (\code{'\n'}) characters separating lines. If the input is a
   character vector then each element is treated as a line.
-  
+
   If \code{nsep} is specified then all characters up to (but excluding)
   the occurrence of \code{nsep} are treated as the row name. The
   remaining characters are split using the \code{sep} character into

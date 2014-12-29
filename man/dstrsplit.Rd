@@ -28,7 +28,8 @@ dstrsplit(x, col_types, sep="|", nsep=NA, strict=TRUE)
   non-digit characters and only the date part is mandatory. See also
   \code{fasttime::asPOSIXct} for details.
   }
-  \item{sep}{single character: field (column) separator}
+  \item{sep}{single character: field (column) separator. Set to \code{NA}
+    for no seperator; in other words, a single column.}
   \item{nsep}{index name separator (single character) or \code{NA} if no
     index names are included}
   \item{strict}{logical, if \code{FALSE} then \code{dstrsplit} will not
