@@ -1,7 +1,7 @@
 \name{mstrsplit}
 \alias{mstrsplit}
 \title{
-  Split ASCII input into a matrix
+  Split binary or character input into a matrix
 }
 \description{
   \code{mstrsplit} takes either raw or character vector and splits it
@@ -29,7 +29,7 @@ mstrsplit(x, sep = "|", nsep = NA, line = 1L, strict = TRUE, ncol = NA,
     will be converted to numeric values on the fly}
 }
 \details{
-  If the input is a raw vector, then it is interpreted as ASCII content
+  If the input is a raw vector, then it is interpreted as ASCII/UTF-8 content
   with LF (\code{'\n'}) characters separating lines. If the input is a
   character vector then each element is treated as a line.
 

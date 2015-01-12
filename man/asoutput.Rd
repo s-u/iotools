@@ -6,7 +6,7 @@
 \alias{as.output.matrix}
 \alias{as.output.table}
 \title{
-  ASCII Output 
+  Character Output
 }
 \description{
   Create objects of class \code{output}.
@@ -21,7 +21,7 @@
 }
 \details{
   \code{as.output} is generic, and methods can be written to support
-  new classes. The output is meant to be an ASCII vector suitable for
+  new classes. The output is meant to be an character vector suitable for
   writing to the disk or sending over a connection.
 }
 \value{

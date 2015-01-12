@@ -1,7 +1,7 @@
 \name{dstrfw}
 \alias{dstrfw}
 \title{
-  Split fixed width ASCII input into a dataframe
+  Split fixed width input into a dataframe
 }
 \description{
   \code{dstrfw} takes raw or character vector and splits it

@@ -2,7 +2,7 @@
 \alias{dstrsplit}
 \alias{rowindex}
 \title{
-  Split ASCII input into a dataframe
+  Split binary or character input into a dataframe
 }
 \description{
   \code{dstrsplit} takes raw or character vector and splits it
