@@ -1,6 +1,6 @@
 # wrappers for using iotools locally; loads input, writes output,
 
-input <- function(file_name, formatter = .default.formatter) {
+input.file <- function(file_name, formatter = mstrsplit, ...) {
   if (is.character(file_name)) {
     input = file(file_name, "rb")
     on.exit(close(input))
@@ -9,10 +9,10 @@ input <- function(file_name, formatter = .default.formatter) {
   }
 
   n = file.info(file_name)$size
-  formatter(readBin(input, what="raw", n=n))
+  formatter(readBin(input, what="raw", n=n), ...)
 }
 
-output <- function(x, file, formatter.output = NULL) {
+output.file <- function(x, file, formatter.output = NULL) {
   if (is.character(ret <- file)) {
     output = file(file, "wb")
     on.exit(close(output))
