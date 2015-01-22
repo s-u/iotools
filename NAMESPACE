@@ -1,2 +1,2 @@
 useDynLib(iotools, stdin_read, stdout_writeBin, mat_split, df_split, df_split_fw, create_chunk_reader, chunk_read, ctapply_, chunk_apply, chunk_tapply, pass, which_min_key)
-export(mstrsplit, dstrsplit, dstrfw, input.file, output.file, .default.formatter, writeBIN, chunk.reader, read.chunk, ctapply, chunk.apply, chunk.tapply, which.min.key, line.merge, as.output, as.output.data.frame, as.output.table, as.output.matrix, as.output.list)
+export(mstrsplit, dstrsplit, dstrfw, input.file, output.file, .default.formatter, writeBIN, chunk.reader, read.chunk, ctapply, chunk.apply, chunk.tapply, which.min.key, line.merge, as.output, as.output.default, as.output.data.frame, as.output.table, as.output.matrix, as.output.list)
