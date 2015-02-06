@@ -24,9 +24,9 @@ static long count_lines(SEXP sRaw) {
 }
 
 SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
-	      SEXP sColTypesCd, SEXP sColNames) {
+	      SEXP sColTypesCd, SEXP sColNames, SEXP sSkip) {
     char sep;
-    int nsep, use_ncol, resilient, ncol, i, j, k, len, nmsep_flag;
+    int nsep, use_ncol, resilient, ncol, i, j, k, len, nmsep_flag, skip;
     int * col_types;
     unsigned int nrow;
     char num_buf[48];
@@ -36,7 +36,7 @@ SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
     SEXP sZerochar;
 
     sZerochar = PROTECT(mkChar(""));
-    
+
     // Parse inputs
     sep = CHAR(STRING_ELT(sSep, 0))[0];
     if (TYPEOF(sNamesSep) == STRSXP && LENGTH(sNamesSep) > 0)
@@ -48,7 +48,8 @@ SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
     ncol = use_ncol; /* NOTE: "character" is prepended by the R code if nmsep is TRUE,
 			      so ncol *does* include the key column */
     col_types = INTEGER(sColTypesCd);
-    
+    skip = INTEGER(sSkip)[0];
+
     /* count non-NA columns */
     for (i = 0; i < use_ncol; i++)
 	if (col_types[i] == NA_CD) ncol--;
@@ -56,12 +57,26 @@ SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
     /* check input */
     if (TYPEOF(s) == RAWSXP) {
 	nrow = count_lines(s);
-	sraw = (const char*) RAW(s);
-	send = sraw + XLENGTH(s);
-    } else if (TYPEOF(s) == STRSXP)
-	nrow = LENGTH(s);
-    else
-	Rf_error("invalid input to split - must be a raw or character vector");
+      sraw = (const char*) RAW(s);
+      send = sraw + XLENGTH(s);
+      if (nrow >= skip) {
+        nrow = nrow - skip;
+        for (i = 0; i < skip; i++) sraw = memchr(sraw,'\n',XLENGTH(s)) + 1;
+      } else {
+        nrow = 0;
+        sraw = send;
+      }
+    } else if (TYPEOF(s) == STRSXP) {
+      nrow = LENGTH(s);
+      if (nrow >= skip) {
+        nrow -= skip;
+      } else {
+        skip = nrow;
+        nrow = 0;
+      }
+    } else {
+      Rf_error("invalid input to split - must be a raw or character vector");
+    }
 
     /* allocate result */
     PROTECT(sOutput = allocVector(VECSXP, ncol));
@@ -78,7 +93,7 @@ SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
 
     /* set class */
     classgets(sOutput, mkString("data.frame"));
-    
+
     /* Create SEXP for each element of the output */
     j = 0;
     for (i = 0; i < use_ncol; i++) {
@@ -89,7 +104,7 @@ SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
 	case INTEGER_CD:
 	    SET_VECTOR_ELT(sOutput, j++, allocVector(INTSXP, nrow));
 	    break;
-	    
+
 	case TS_CD:
 	    {
 		SEXP st, clv;
@@ -110,7 +125,7 @@ SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
 	case NUMERIC_CD:
 	    SET_VECTOR_ELT(sOutput, j++, allocVector(REALSXP, nrow));
 	    break;
-	    
+
 	case CHAR_CD:
 	    SET_VECTOR_ELT(sOutput, j++, allocVector(STRSXP, nrow));
 	    break;
@@ -126,7 +141,7 @@ SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
 	    if (!le) le = send;
 	    sraw = le + 1;
 	} else {
-	    l = CHAR(STRING_ELT(s, k));
+	    l = CHAR(STRING_ELT(s, k + skip));
 	    le = l + strlen(l); /* probably lame, but using strings is way inefficeint anyway ;) */
 	}
 	if (nmsep_flag) {
@@ -143,7 +158,7 @@ SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
 	while (l < le) {
 	    if (!(c = memchr(l, sep, le - l)))
 		c = le;
-	    
+
 	    if (i >= use_ncol) {
 		if (resilient) break;
 		Rf_error("line %lu: too many input columns (expected %u)", k, use_ncol);
@@ -154,11 +169,11 @@ SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
 		INTEGER(VECTOR_ELT(sOutput, j))[k] = atoi(l);
 		j++;
 		break;
-		
+
 	    case TS_CD:
 		REAL(VECTOR_ELT(sOutput, j++))[k] = parse_ts(l, c);
 		break;
-		
+
 	    case NUMERIC_CD:
 		len = (int) (c - l);
 		/* watch for overflow and truncate -- should we warn? */
@@ -186,12 +201,12 @@ SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
 	    case INTEGER_CD:
 		INTEGER(VECTOR_ELT(sOutput, j++))[k] = NA_INTEGER;
 		break;
-		
+
 	    case NUMERIC_CD:
 	    case TS_CD:
 		REAL(VECTOR_ELT(sOutput, j++))[k] = NA_REAL;
 		break;
-		
+
 	    case CHAR_CD:
 		SET_STRING_ELT(VECTOR_ELT(sOutput, j++), k, R_NaString);
 		break;

@@ -24,7 +24,7 @@ static SEXP mat_split_mem(const char *mem, size_t len, char sep, int nsep, unsig
     if (ee > mem && ee[-1] == '\n') lines--; /* don't count the last empty one */
     nrow = lines;
     c = mem;
-    if (nsep >= 0) { /* skip the names part */	
+    if (nsep >= 0) { /* skip the names part */
 	if ((c = memchr(c, nsep, e - c))) c++; else c = mem;
     }
     if (use_ncol < 1) { /* if the user didn't specify columns, guess them from the first row */
@@ -42,7 +42,7 @@ static SEXP mat_split_mem(const char *mem, size_t len, char sep, int nsep, unsig
 	SEXP dimn;
 	dimn = PROTECT(allocVector(VECSXP, 2));
 	SET_VECTOR_ELT(dimn, 0, (rnam = allocVector(STRSXP, nrow)));
-	SET_VECTOR_ELT(dimn, 1, R_NilValue);	
+	SET_VECTOR_ELT(dimn, 1, R_NilValue);
 	setAttrib(res, R_DimNamesSymbol, dimn);
 	UNPROTECT(1);
     }
@@ -190,7 +190,7 @@ SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sLine, SEXP sResilient, S
 		if (resilient) break;
 		Rf_error("line %lu: too many columns (expected %u)", line + (unsigned long)(i + 1), ncol);
 	    }
-	    if (type_flag == 1) 
+	    if (type_flag == 1)
                 SET_STRING_ELT(res, j, Rf_mkCharLen(l, c - l));
 	    else {
 		int len = (int) (c - l);

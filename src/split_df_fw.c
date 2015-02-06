@@ -20,8 +20,8 @@ static long count_lines(SEXP sRaw) {
 }
 
 SEXP df_split_fw(SEXP s, SEXP sColWidths, SEXP sNamesSep,
-	                SEXP sResilient, SEXP sNcol, SEXP sColTypesCd, SEXP sColNames) {
-    int nsep, use_ncol, resilient, ncol, i, j, k, len, nmsep_flag;
+	                SEXP sResilient, SEXP sNcol, SEXP sColTypesCd, SEXP sColNames, SEXP sSkip) {
+    int nsep, use_ncol, resilient, ncol, i, j, k, len, nmsep_flag, skip;
     int * col_types;
     int * width;
     unsigned int nrow;
@@ -44,6 +44,7 @@ SEXP df_split_fw(SEXP s, SEXP sColWidths, SEXP sNamesSep,
     ncol = use_ncol; /* NOTE: "character" is prepended by the R code if nmsep is TRUE,
                         so ncol *does* include the key column */
     col_types = INTEGER(sColTypesCd);
+    skip = INTEGER(sSkip)[0];
     width = INTEGER(sColWidths);
 
     /* count non-NA columns */
@@ -55,11 +56,24 @@ SEXP df_split_fw(SEXP s, SEXP sColWidths, SEXP sNamesSep,
       nrow = count_lines(s);
       sraw = (const char*) RAW(s);
       send = sraw + XLENGTH(s);
-    } else if (TYPEOF(s) == STRSXP)
+      if (nrow >= skip) {
+        nrow = nrow - skip;
+        for (i = 0; i < skip; i++) sraw = memchr(sraw,'\n',XLENGTH(s)) + 1;
+      } else {
+        nrow = 0;
+        sraw = send;
+      }
+    } else if (TYPEOF(s) == STRSXP) {
       nrow = LENGTH(s);
-    else
+      if (nrow >= skip) {
+        nrow -= skip;
+      } else {
+        skip = nrow;
+        nrow = 0;
+      }
+    } else {
       Rf_error("invalid input to split - must be a raw or character vector");
-
+    }
     /* allocate result */
     PROTECT(sOutput = allocVector(VECSXP, ncol));
 
@@ -106,7 +120,7 @@ SEXP df_split_fw(SEXP s, SEXP sColWidths, SEXP sNamesSep,
           if (!le) le = send;
           sraw = le + 1;
       } else {
-          l = CHAR(STRING_ELT(s, k));
+          l = CHAR(STRING_ELT(s, k + skip));
           le = l + strlen(l); /* probably lame, but using strings is way inefficeint anyway ;) */
       }
 

@@ -8,8 +8,7 @@
   into a dataframe according to a vector of fixed widths.
 }
 \usage{
-dstrfw(x, col_types, widths, nsep = NA, strict=TRUE)
-
+dstrfw(x, col_types, widths, nsep = NA, strict=TRUE, skip=0L)
 }
 \arguments{
   \item{x}{character vector (each element is treated as a row) or a
@@ -29,6 +28,8 @@ dstrfw(x, col_types, widths, nsep = NA, strict=TRUE)
   \item{strict}{logical, if \code{FALSE} then \code{dstrsplit} will not
     fail on parsing errors, otherwise input not matching the format
     (e.g. more columns than expected) will cause an error.}
+  \item{skip}{integer: the number of lines of the data file to skip before
+            beginning to read data.}
 }
 \details{
   If \code{nsep} is specified, the output of \code{dstrsplit} contains

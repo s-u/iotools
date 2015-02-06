@@ -12,7 +12,7 @@ mstrsplit <- function(x, sep="|", nsep=NA, line=1L, strict=TRUE, ncol = NA,
   .Call(mat_split, x, sep, nsep, line, !strict, ncol, type_flag)
 }
 
-dstrsplit <- function(x, col_types, sep="|", nsep=NA, strict=TRUE) {
+dstrsplit <- function(x, col_types, sep="|", nsep=NA, strict=TRUE, skip=0L) {
   if (is.na(sep)) {
     sep = "\n"
     ncol = 1L
@@ -33,10 +33,10 @@ dstrsplit <- function(x, col_types, sep="|", nsep=NA, strict=TRUE) {
   ncol <- length(col_types)
   col_types_cd = match(col_types, c("integer", "numeric", "character", "POSIXct", NA)) - 1L
   if(any(is.na(col_types_cd))) stop("Invalid column types")
-  .Call(df_split, x, sep, nsep, !strict, ncol, col_types_cd, col.names)
+  .Call(df_split, x, sep, nsep, !strict, ncol, col_types_cd, col.names, as.integer(skip))
 }
 
-dstrfw <- function(x, col_types, widths, nsep=NA, strict=TRUE) {
+dstrfw <- function(x, col_types, widths, nsep=NA, strict=TRUE, skip=0L) {
   if (is.null(col.names <- names(col_types)))
     col.names <- paste0("V", seq_along(col_types))
   if (is.list(col_types))
@@ -55,7 +55,7 @@ dstrfw <- function(x, col_types, widths, nsep=NA, strict=TRUE) {
   col_types_cd = match(col_types, c("integer", "numeric", "character", NA)) - 1L
   if(any(is.na(col_types_cd))) stop("Invalid column types")
   .Call(df_split_fw, x, as.integer(widths), nsep, !strict, ncol,
-          col_types_cd, col.names)
+          col_types_cd, col.names, as.integer(skip))
 }
 
 .default.formatter <- function(x) {
