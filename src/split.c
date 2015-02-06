@@ -10,22 +10,32 @@
    if specified but not present in the line, it is assumed to be ""
    everything else is split on <sep>
    the first line defines the number of columns for the entire matrix */
-static SEXP mat_split_mem(const char *mem, size_t len, char sep, int nsep, unsigned long line, int flags, int use_ncol, const int type_flag) {
+static SEXP mat_split_mem(const char *mem, size_t len, char sep, int nsep, unsigned long line, int flags,
+          int use_ncol, const int type_flag, int skip) {
     unsigned int ncol = (unsigned int) use_ncol, nrow, i, N;
     unsigned long lines = 1;
     SEXP res, rnam, zerochar = 0;
     char num_buf[48];
     double * res_ptr;
-    const char *e = memchr(mem, '\n', len), *ee = mem + len, *c, *l;
+    const char *e = memchr(mem, '\n', len), *ee = mem + len, *c, *l, *s;
     if (!e) e = ee; /* e is the end of the first line - needed to count columns */
     c = mem;
     /* first pass - find the # of lines */
     while ((c = memchr(c, '\n', ee - c))) { c++; lines++; }
     if (ee > mem && ee[-1] == '\n') lines--; /* don't count the last empty one */
     nrow = lines;
-    c = mem;
+    s = mem;
+    if (nrow > skip) {
+      nrow = nrow - skip;
+      for (i = 0; i < skip; i++) s = memchr(s, '\n', ee - s) + 1;
+      e = memchr(s, '\n', ee - s);
+      if (e == NULL) e = ee;
+    } else {
+      return allocMatrix(STRSXP, 0, 0);
+    }
+    c = s;
     if (nsep >= 0) { /* skip the names part */
-	if ((c = memchr(c, nsep, e - c))) c++; else c = mem;
+	if ((c = memchr(c, nsep, e - c))) c++; else c = s;
     }
     if (use_ncol < 1) { /* if the user didn't specify columns, guess them from the first row */
 	ncol = 1;
@@ -46,7 +56,7 @@ static SEXP mat_split_mem(const char *mem, size_t len, char sep, int nsep, unsig
 	setAttrib(res, R_DimNamesSymbol, dimn);
 	UNPROTECT(1);
     }
-    l = mem;
+    l = s;
     for (i = 0; i < nrow; i++) {
 	const char *le = memchr(l, '\n', ee - l);
 	int j = i;
@@ -121,11 +131,12 @@ static SEXP mat_split_mem(const char *mem, size_t len, char sep, int nsep, unsig
     return res;
 }
 
-SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sLine, SEXP sResilient, SEXP sNcol, SEXP sTypeFlag) {
+SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sLine, SEXP sResilient, SEXP sNcol, SEXP sTypeFlag, SEXP sSkip) {
     unsigned long line = 1;
     unsigned int ncol = 1, nrow, np = 0, i, N, resilient = asInteger(sResilient);
     int use_ncol = asInteger(sNcol);
     int nsep = -1;
+    int skip =INTEGER(sSkip)[0];
     SEXP res, rnam, zerochar = 0;
     char sep;
     char num_buf[48];
@@ -143,11 +154,14 @@ SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sLine, SEXP sResilient, S
     sep = CHAR(STRING_ELT(sSep, 0))[0];
     if (TYPEOF(s) != STRSXP) {
 	if (TYPEOF(s) == RAWSXP)
-	    return mat_split_mem((const char*) RAW(s), LENGTH(s), sep, nsep, line, resilient ? FL_RESILIENT : 0, use_ncol, type_flag);
+	    return mat_split_mem((const char*) RAW(s), LENGTH(s), sep, nsep, line, resilient ? FL_RESILIENT : 0, use_ncol, type_flag, skip);
 	s = PROTECT(coerceVector(s, STRSXP));
 	np++;
     }
     nrow = LENGTH(s);
+    if (nrow > skip) {
+      nrow = nrow - skip;
+    } else nrow = 0;
     if (!nrow) {
 	if (np) UNPROTECT(np);
 	return allocMatrix(STRSXP, 0, 0);
@@ -173,7 +187,7 @@ SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sLine, SEXP sResilient, S
     }
     np++;
     for (i = 0; i < nrow; i++) {
-	const char *l = CHAR(STRING_ELT(s, i));
+	const char *l = CHAR(STRING_ELT(s, i + skip));
 	int j = i;
 	if (nsep >= 0) {
 	    c = strchr(l, nsep);

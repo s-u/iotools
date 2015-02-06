@@ -9,7 +9,7 @@
 }
 \usage{
 mstrsplit(x, sep = "|", nsep = NA, line = 1L, strict = TRUE, ncol = NA,
-          type=c("character", "numeric"))
+          type=c("character", "numeric"), skip=0L)
 }
 \arguments{
   \item{x}{character vector (each element is treated as a row) or a raw
@@ -27,6 +27,8 @@ mstrsplit(x, sep = "|", nsep = NA, line = 1L, strict = TRUE, ncol = NA,
     of columns is guessed from the first line.}
   \item{type}{one of 'character' or 'numeric'; if the latter, the output
     will be converted to numeric values on the fly}
+  \item{skip}{integer: the number of lines of the data file to skip before
+            beginning to read data.}
 }
 \details{
   If the input is a raw vector, then it is interpreted as ASCII/UTF-8 content

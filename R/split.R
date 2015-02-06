@@ -1,5 +1,5 @@
 mstrsplit <- function(x, sep="|", nsep=NA, line=1L, strict=TRUE, ncol = NA,
-                      type=c("character", "numeric")) {
+                      type=c("character", "numeric"), skip=0L) {
   if (is.na(sep)) {
     sep = "\n"
     ncol = 1L
@@ -9,7 +9,7 @@ mstrsplit <- function(x, sep="|", nsep=NA, line=1L, strict=TRUE, ncol = NA,
   if (!is.na(nsep) && (length(charToRaw(nsep)) != 1L)) stop("Seperator must one byte wide (i.e., ASCII).")
 
   type_flag = as.integer(match.arg(type) == "character")
-  .Call(mat_split, x, sep, nsep, line, !strict, ncol, type_flag)
+  .Call(mat_split, x, sep, nsep, line, !strict, ncol, type_flag, as.integer(skip))
 }
 
 dstrsplit <- function(x, col_types, sep="|", nsep=NA, strict=TRUE, skip=0L) {
