@@ -23,14 +23,27 @@ static long count_lines(SEXP sRaw) {
     return lines;
 }
 
+static long count_lines_bounded(SEXP sRaw, int bound) {
+    const char *c = (const char*) RAW(sRaw);
+    const char *e = c + XLENGTH(sRaw);
+    long lines = 0;
+    while ((c = memchr(c, '\n', e - c)) && lines < bound) {
+      lines++;
+      c++;
+    }
+    if (e > c && e[-1] != '\n') lines++;
+    return lines;
+}
+
 SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
-	      SEXP sColTypesCd, SEXP sColNames, SEXP sSkip) {
+	      SEXP sColTypesCd, SEXP sColNames, SEXP sSkip, SEXP sNlines) {
     char sep;
     int nsep, use_ncol, resilient, ncol, i, j, k, len, nmsep_flag, skip;
     int * col_types;
     unsigned int nrow;
     char num_buf[48];
     const char *c, *sraw, *send;
+    int nlines = INTEGER(sNlines)[0];
 
     SEXP sOutput, tmp, sOutputNames;
     SEXP sZerochar;
@@ -56,7 +69,7 @@ SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
 
     /* check input */
     if (TYPEOF(s) == RAWSXP) {
-	nrow = count_lines(s);
+      nrow = (nlines >= 0) ? count_lines_bounded(s, nlines + skip) : count_lines(s);
       sraw = (const char*) RAW(s);
       send = sraw + XLENGTH(s);
       if (nrow >= skip) {
@@ -77,6 +90,7 @@ SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
     } else {
       Rf_error("invalid input to split - must be a raw or character vector");
     }
+    if (nlines >= 0 && nrow > nlines) nrow = nlines;
 
     /* allocate result */
     PROTECT(sOutput = allocVector(VECSXP, ncol));

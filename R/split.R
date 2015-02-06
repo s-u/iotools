@@ -1,5 +1,5 @@
 mstrsplit <- function(x, sep="|", nsep=NA, line=1L, strict=TRUE, ncol = NA,
-                      type=c("character", "numeric"), skip=0L) {
+                      type=c("character", "numeric"), skip=0L, nrows=-1L) {
   if (is.na(sep)) {
     sep = "\n"
     ncol = 1L
@@ -9,10 +9,10 @@ mstrsplit <- function(x, sep="|", nsep=NA, line=1L, strict=TRUE, ncol = NA,
   if (!is.na(nsep) && (length(charToRaw(nsep)) != 1L)) stop("Seperator must one byte wide (i.e., ASCII).")
 
   type_flag = as.integer(match.arg(type) == "character")
-  .Call(mat_split, x, sep, nsep, line, !strict, ncol, type_flag, as.integer(skip))
+  .Call(mat_split, x, sep, nsep, line, !strict, ncol, type_flag, as.integer(skip), as.integer(nrows))
 }
 
-dstrsplit <- function(x, col_types, sep="|", nsep=NA, strict=TRUE, skip=0L) {
+dstrsplit <- function(x, col_types, sep="|", nsep=NA, strict=TRUE, skip=0L, nrows=-1L) {
   if (is.na(sep)) {
     sep = "\n"
     ncol = 1L
@@ -33,10 +33,10 @@ dstrsplit <- function(x, col_types, sep="|", nsep=NA, strict=TRUE, skip=0L) {
   ncol <- length(col_types)
   col_types_cd = match(col_types, c("integer", "numeric", "character", "POSIXct", NA)) - 1L
   if(any(is.na(col_types_cd))) stop("Invalid column types")
-  .Call(df_split, x, sep, nsep, !strict, ncol, col_types_cd, col.names, as.integer(skip))
+  .Call(df_split, x, sep, nsep, !strict, ncol, col_types_cd, col.names, as.integer(skip), as.integer(nrows))
 }
 
-dstrfw <- function(x, col_types, widths, nsep=NA, strict=TRUE, skip=0L) {
+dstrfw <- function(x, col_types, widths, nsep=NA, strict=TRUE, skip=0L, nrows=-1L) {
   if (is.null(col.names <- names(col_types)))
     col.names <- paste0("V", seq_along(col_types))
   if (is.list(col_types))
@@ -55,7 +55,7 @@ dstrfw <- function(x, col_types, widths, nsep=NA, strict=TRUE, skip=0L) {
   col_types_cd = match(col_types, c("integer", "numeric", "character", NA)) - 1L
   if(any(is.na(col_types_cd))) stop("Invalid column types")
   .Call(df_split_fw, x, as.integer(widths), nsep, !strict, ncol,
-          col_types_cd, col.names, as.integer(skip))
+          col_types_cd, col.names, as.integer(skip), as.integer(nrows))
 }
 
 .default.formatter <- function(x) {
