@@ -19,8 +19,15 @@ dstrfw(x, col_types, widths, nsep = NA, strict=TRUE, skip=0L, nrows=-1L)
     contained element. It will not be recycled, and must
     be at least as long as the longest row if \code{strict} is \code{TRUE}.
 
-    Possible values are 'integer', 'numeric', 'character', and NA. The
-    latter indicates that the column should be skipped in the output.}
+    Possible values are \code{"NULL"} (when the column is skipped) one of
+    the six atomic vector types (\code{'character'}, \code{'numeric'},
+    \code{'logical'}, \code{'integer'},  \code{'complex'}, \code{'raw'})
+     or \code{POSIXct}.
+    'POSIXct' will parse date format in the form "YYYY-MM-DD hh:mm:ss.sss"
+    assuming GMT time zone. The separators between digits can be any
+    non-digit characters and only the date part is mandatory. See also
+    \code{fasttime::asPOSIXct} for details.
+  }
   \item{widths}{a vector of widths of the columns. Must be the same length
     as \code{col_types}.}
   \item{nsep}{index name separator (single character) or \code{NA} if no
@@ -65,12 +72,13 @@ dstrfw(x, col_types, widths, nsep = NA, strict=TRUE, skip=0L, nrows=-1L)
 \examples{
 input = c("bear\t22.7horse+3", "pear\t 3.4mouse-3", "dogs\t14.8prime-8")
 z = dstrfw(x = input, col_types = c("numeric", "character", "integer"),
-              width=c(4L,5L,2L), nsep="\t")
+      width=c(4L,5L,2L), nsep="\t")
 z
 
-# Now without row names (treat seperator as a 1 char width column with type NA)
-z = dstrfw(x = input, col_types = c("character", NA, "numeric", "character", "integer"),
-              width=c(4L,1L,4L,5L,2L))
+# Now without row names (treat seperator as a 1 char width column with type NULL)
+z = dstrfw(x = input,
+    col_types = c("character", "NULL", "numeric", "character", "integer"),
+    width=c(4L,1L,4L,5L,2L))
 z
 }
 \keyword{manip}

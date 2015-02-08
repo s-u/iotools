@@ -1,5 +1,6 @@
-mstrsplit <- function(x, sep="|", nsep=NA, line=1L, strict=TRUE, ncol = NA,
-                      type=c("character", "numeric"), skip=0L, nrows=-1L) {
+mstrsplit <- function(x, sep="|", nsep=NA, strict=TRUE, ncol = NA,
+                      type=c("character", "numeric", "logical", "integer",  "complex", "raw"),
+                      skip=0L, nrows=-1L) {
   if (is.na(sep)) {
     sep = "\n"
     ncol = 1L
@@ -7,9 +8,9 @@ mstrsplit <- function(x, sep="|", nsep=NA, line=1L, strict=TRUE, ncol = NA,
   if (nchar(sep) != 1L) stop("Seperator must be either NA or a one character value.")
   if (length(charToRaw(sep)) != 1L) stop("Seperator must one byte wide (i.e., ASCII).")
   if (!is.na(nsep) && (length(charToRaw(nsep)) != 1L)) stop("Seperator must one byte wide (i.e., ASCII).")
+  type = do.call(match.arg(type), list(0))
 
-  type_flag = as.integer(match.arg(type) == "character")
-  .Call(mat_split, x, sep, nsep, line, !strict, ncol, type_flag, as.integer(skip), as.integer(nrows))
+  .Call(mat_split, x, sep, nsep, !strict, ncol, type, as.integer(skip), as.integer(nrows))
 }
 
 dstrsplit <- function(x, col_types, sep="|", nsep=NA, strict=TRUE, skip=0L, nrows=-1L) {
@@ -31,9 +32,19 @@ dstrsplit <- function(x, col_types, sep="|", nsep=NA, strict=TRUE, skip=0L, nrow
   }
 
   ncol <- length(col_types)
-  col_types_cd = match(col_types, c("integer", "numeric", "character", "POSIXct", NA)) - 1L
-  if(any(is.na(col_types_cd))) stop("Invalid column types")
-  .Call(df_split, x, sep, nsep, !strict, ncol, col_types_cd, col.names, as.integer(skip), as.integer(nrows))
+  col_types[col_types %in% c("real", "double")] <- "numeric"
+  what <- rep.int(list(""), ncol)
+  names(what) <- names(col_types)
+  known <- col_types %in% c("logical", "integer", "numeric", "complex", "character", "raw")
+  what[known] <- sapply(col_types[known], do.call, list(0))
+  what[col_types %in% "NULL"] <- list(NULL)
+  what[col_types %in% "POSIXct"] <- list(list())
+
+  bad = sapply(what, function(v) length(v) != 0L)
+  if (any(bad)) stop(paste0("Invalid input to col_types: ", col_types[bad]))
+
+  res = .Call(df_split, x, sep, nsep, !strict, ncol, what, col.names, as.integer(skip), as.integer(nrows))
+  return(res)
 }
 
 dstrfw <- function(x, col_types, widths, nsep=NA, strict=TRUE, skip=0L, nrows=-1L) {
@@ -52,10 +63,21 @@ dstrfw <- function(x, col_types, widths, nsep=NA, strict=TRUE, skip=0L, nrows=-1
   }
   ncol <- length(col_types)
 
-  col_types_cd = match(col_types, c("integer", "numeric", "character", NA)) - 1L
-  if(any(is.na(col_types_cd))) stop("Invalid column types")
-  .Call(df_split_fw, x, as.integer(widths), nsep, !strict, ncol,
-          col_types_cd, col.names, as.integer(skip), as.integer(nrows))
+  ncol <- length(col_types)
+  col_types[col_types %in% c("real", "double")] <- "numeric"
+  what <- rep.int(list(""), ncol)
+  names(what) <- names(col_types)
+  known <- col_types %in% c("logical", "integer", "numeric", "complex", "character", "raw")
+  what[known] <- sapply(col_types[known], do.call, list(0))
+  what[col_types %in% "NULL"] <- list(NULL)
+  what[col_types %in% "POSIXct"] <- list(list())
+
+  bad = sapply(what, function(v) length(v) != 0L)
+  if (any(bad)) stop("Invalid input to col_types: ", col_types[bad])
+
+  res = .Call(df_split_fw, x, as.integer(widths), nsep, !strict, ncol,
+          what, col.names, as.integer(skip), as.integer(nrows))
+  return(res)
 }
 
 .default.formatter <- function(x) {
