@@ -78,7 +78,7 @@ read.table.raw = function (file, header = FALSE, sep = "", quote = "", dec = "."
     comment.char = "", allowEscapes = FALSE, flush = FALSE,
     stringsAsFactors = FALSE, fileEncoding = "",
     encoding = "unknown", text, skipNul = FALSE,
-    nrowsClasses = 10L, nsep = NA, useScan = NA)
+    nrowsClasses = 10L, na.strings.Classes = "NA", nsep = NA, useScan = NA)
 {
   # Read in data as a raw vector:
   if (!missing(file)) {
@@ -104,18 +104,22 @@ read.table.raw = function (file, header = FALSE, sep = "", quote = "", dec = "."
 
   # Run a small subset of the data through read.table:
   subset = mstrsplit(r, sep=NA, nsep=nsep, nrows=nrowsClasses, skip=skip)
+  tc = textConnection(subset)
+  on.exit(close(tc), add=TRUE)
   if (missing(col.names)) {
-    test = read.table(textConnection(subset), header = header, sep = sep, quote = quote,
+    test = read.table(tc, header = header, sep = sep, quote = quote,
       dec = dec, numerals = numerals, row.names = row.names, as.is = as.is,
-      na.strings = na.strings, colClasses = colClasses, nrows = nrows, skip = skip,
+      na.strings = c(na.strings.Classes, na.strings), colClasses = colClasses,
+      nrows = nrows, skip = skip,
       check.names = check.names, fill = fill, strip.white = strip.white,
       blank.lines.skip = blank.lines.skip, comment.char = comment.char,
       allowEscapes = allowEscapes, flush = flush, stringsAsFactors = stringsAsFactors,
       fileEncoding = fileEncoding, encoding = encoding, skipNul = FALSE)
   } else {
-    test = read.table(textConnection(subset), header = header, sep = sep, quote = quote,
+    test = read.table(tc, header = header, sep = sep, quote = quote,
       dec = dec, numerals = numerals, row.names = row.names, col.names = col.names, as.is = as.is,
-      na.strings = na.strings, colClasses = colClasses, nrows = nrows, skip = skip,
+      na.strings = c(na.strings.Classes, na.strings), colClasses = colClasses,
+      nrows = nrows, skip = skip,
       check.names = check.names, fill = fill, strip.white = strip.white,
       blank.lines.skip = blank.lines.skip, comment.char = comment.char,
       allowEscapes = allowEscapes, flush = flush, stringsAsFactors = stringsAsFactors,
@@ -142,7 +146,9 @@ read.table.raw = function (file, header = FALSE, sep = "", quote = "", dec = "."
   keep = !sapply(what, is.null)
 
   if (useScan) {
-    x = scan(rawConnection(r), what = what,
+    rc = rawConnection(r)
+    on.exit(close(rc), add=TRUE)
+    x = scan(rc, what = what,
                  sep = sep, quote = quote, dec = dec, nmax = nrows, skip = skip + header,
                  na.strings = na.strings, quiet = TRUE, fill = fill,
                  strip.white = strip.white, blank.lines.skip = blank.lines.skip,
@@ -158,7 +164,7 @@ read.table.raw = function (file, header = FALSE, sep = "", quote = "", dec = "."
     what[colClasses %in% "POSIXct"] <- list(list())
     known[colClasses %in% "POSIXct"] = TRUE
     x = dstrsplit(r, col_types = colClassesUse, sep=sep, nsep=nsep,
-                   strict=TRUE, skip=skip + header, nrows=nrows)
+                   strict=FALSE, skip=skip + header, nrows=nrows)
   }
 
   # Parse input to as.is:
