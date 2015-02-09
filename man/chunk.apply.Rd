@@ -9,7 +9,7 @@
   to each chunk, collecting the results.
 }
 \usage{
-chunk.apply(input, FUN, ..., CH.MERGE = rbind, CH.MAX.SIZE = 33554432)
+chunk.apply(input, FUN, ..., CH.MERGE = rbind, CH.MAX.SIZE = 33554432, parallel=1)
 
 chunk.tapply(input, FUN, ..., sep = "\t", CH.MERGE = rbind, CH.MAX.SIZE = 33554432)
 }
@@ -27,6 +27,7 @@ chunk.tapply(input, FUN, ..., sep = "\t", CH.MERGE = rbind, CH.MAX.SIZE = 335544
   behavior, \code{rbind} for table-like output or \code{c} for a long
   vector.}
   \item{CH.MAX.SIZE}{maximal size of each chunk in bytes}
+  \item{parallel}{the number of parallel processes to use in the calculation (*nix only).}
 }
 \note{
   The input to \code{FUN} is the raw chunk, so typically it is
