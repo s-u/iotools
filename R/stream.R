@@ -3,10 +3,9 @@ chunk.apply <- function(input, FUN, ..., CH.MERGE=rbind, CH.MAX.SIZE=33554432,
   if (!inherits(input, "ChunkReader"))
     reader <- chunk.reader(input)
   if (parallel <= 1 || .Platform$OS.type != "unix") {
-    return(.Call(chunk_apply, reader, CH.MAX.SIZE, CH.MERGE, FUN, 
+    return(.Call(chunk_apply, reader, CH.MAX.SIZE, CH.MERGE, FUN,
                  parent.frame(), .External(pass, ...)))
   } else {
-    library(parallel)
 
     # If CH.MERGE is list, override it with the correct CH.MERGE function.
     if (identical(list, CH.MERGE)) CH.MERGE = function(x, ...) c(x, list(...))
@@ -18,7 +17,7 @@ chunk.apply <- function(input, FUN, ..., CH.MERGE=rbind, CH.MAX.SIZE=33554432,
       if (length(chunk) == 0) {
         break
       }
-      worker_queue[[i]] = mcparallel(FUN(chunk, ...))
+      worker_queue[[i]] = parallel::mcparallel(FUN(chunk, ...))
     }
     if (length(worker_queue) == 0) return(CH.MERGE(NULL))
 
@@ -29,10 +28,10 @@ chunk.apply <- function(input, FUN, ..., CH.MERGE=rbind, CH.MAX.SIZE=33554432,
     ret=NULL
     done=FALSE
     while (!done) {
-      ret = CH.MERGE(ret, mccollect(worker_queue[[1]])[[1]])
+      ret = CH.MERGE(ret, parallel::mccollect(worker_queue[[1]])[[1]])
       worker_queue[1] = NULL
       if (length(chunk) > 0) {
-        worker_queue[[length(worker_queue)+1]] = mcparallel(FUN(chunk, ...))
+        worker_queue[[length(worker_queue)+1]] = parallel::mcparallel(FUN(chunk, ...))
         chunk = read.chunk(reader)
       }
       if (length(worker_queue) == 0) done = TRUE

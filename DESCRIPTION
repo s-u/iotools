@@ -4,7 +4,7 @@ Title: I/O tools for streaming
 Author: Simon Urbanek <Simon.Urbanek@r-project.org>, Taylor Arnold <taylor.arnold@acm.org>
 Maintainer: Simon Urbanek <Simon.Urbanek@r-project.org>
 Depends: R (>= 2.9.0)
-Imports: methods
+Imports: methods, parallel
 Description: Basic I/O tools for streaming.
 License: GPL-2 | GPL-3
 URL: http://www.rforge.net/iotools
