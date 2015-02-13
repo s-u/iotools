@@ -37,7 +37,7 @@ dstrsplit <- function(x, col_types, sep="|", nsep=NA, strict=TRUE, skip=0L, nrow
   names(what) <- names(col_types)
   known <- col_types %in% c("logical", "integer", "numeric", "complex", "character", "raw")
   what[known] <- sapply(col_types[known], do.call, list(0))
-  what[is.na(col_types)] = "NULL"
+  what[is.na(col_types)] = list(NULL)
   what[col_types %in% "NULL"] <- list(NULL)
   what[col_types %in% "POSIXct"] <- list(list())
 
@@ -70,6 +70,7 @@ dstrfw <- function(x, col_types, widths, nsep=NA, strict=TRUE, skip=0L, nrows=-1
   names(what) <- names(col_types)
   known <- col_types %in% c("logical", "integer", "numeric", "complex", "character", "raw")
   what[known] <- sapply(col_types[known], do.call, list(0))
+  what[is.na(col_types)] = list(NULL)
   what[col_types %in% "NULL"] <- list(NULL)
   what[col_types %in% "POSIXct"] <- list(list())
 
