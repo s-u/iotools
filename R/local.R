@@ -127,7 +127,9 @@ read.table.raw = function (file, header = FALSE, sep = "", quote = "", dec = "."
   }
 
   if (!all(is.na(colClasses))) {
-    colClasses[colClasses != "NULL"] = unlist(lapply(test, function(v) class(v[[1]])[[1]]))
+    temp = unlist(lapply(test, function(v) class(v[[1]])[[1]]))
+    colClasses[colClasses != "NULL"] = temp
+    names(colClasses)[colClasses != "NULL"] = names(temp)
   } else colClasses = unlist(lapply(test,function(v) class(v[[1]])[[1]]))
 
   index = which(apply(!is.na(test), 2, sum) == 0L)
