@@ -12,7 +12,7 @@
   Create objects of class \code{output}.
 }
 \usage{
-  as.output(x, sep='\t', ...)
+  as.output(x, ...)
 }
 \arguments{
   \item{x}{object to be converted to an instance of \code{output}.}
