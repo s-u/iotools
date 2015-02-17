@@ -12,12 +12,13 @@
   Create objects of class \code{output}.
 }
 \usage{
-  as.output(x, ...)
+  as.output(x, sep='\t', ...)
 }
 \arguments{
   \item{x}{object to be converted to an instance of \code{output}.}
   \item{...}{optional arguments to be passed to implementing methods
-  of \code{as.output}}
+  of \code{as.output}. For \code{matrix}, and \code{data.frame} 
+  types this includes a \code{sep} argument indicating a field separator.}
 }
 \details{
   \code{as.output} is generic, and methods can be written to support
