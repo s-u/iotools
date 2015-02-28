@@ -2,6 +2,7 @@ chunk.apply <- function(input, FUN, ..., CH.MERGE=rbind, CH.MAX.SIZE=33554432,
                         parallel=1) {
   if (!inherits(input, "ChunkReader"))
     reader <- chunk.reader(input)
+  else reader <- input
   if (parallel <= 1 || .Platform$OS.type != "unix") {
     return(.Call(chunk_apply, reader, CH.MAX.SIZE, CH.MERGE, FUN,
                  parent.frame(), .External(pass, ...)))
