@@ -1,4 +1,5 @@
 \name{readAsRaw}
+\alias{readAsRaw}
 \title{
   Read binary data in as raw
 }

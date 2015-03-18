@@ -9,9 +9,9 @@
   according to the separator.
 }
 \usage{
-mstrsplit(x, sep="|", nsep=NA, strict=TRUE, ncol = NA,
+imstrsplit(x, sep="|", nsep=NA, strict=TRUE, ncol = NA,
           type=c("character", "numeric", "logical", "integer",  "complex", 
-                 "raw"))
+                 "raw"), max.line = 65536L, max.size = 33554432L)
 }
 \arguments{
   \item{x}{character vector (each element is treated as a row) or a raw
@@ -30,6 +30,9 @@ mstrsplit(x, sep="|", nsep=NA, strict=TRUE, ncol = NA,
     \code{'complex'}, or \code{'raw'}. The output matrix will use this as its
     storage mode and the input will be parsed directly into this format
     without using intermediate strings.}
+  \item{max.line}{maximum length of one line (in byets) - determines the
+    size of the read buffer, default is 64kb}
+  \item{max.size}{maximum size of the chunk (in bytes), default is 32Mb}
 }
 \details{
   If the input is a raw vector, then it is interpreted as ASCII/UTF-8 content
