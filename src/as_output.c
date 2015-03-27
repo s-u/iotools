@@ -1,3 +1,4 @@
+#define  USE_RINTERNALS 1
 #include <Rinternals.h>
 #include <Rdefines.h>
 #include <string.h>
@@ -7,21 +8,26 @@
 
 #include "utils.h"
 
+/* FIXME: all the code below breaks on 32-bit overflows - we need to re-write it
+   both with long vector support and 64-bit accumulators
+
+   FIXME: the functions use realloc instead of buffer chains, that will result in
+   memory fragmentation; also it uses malloc() instead of R memory pools */
+
 SEXP as_output_matrix(SEXP sMat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNsep, SEXP sRownamesFlag) {
-  int nrow = INTEGER(sNrow)[0];
-  int ncol = INTEGER(sNcol)[0];
-  int len = nrow * ncol;
-  int rownamesFlag = INTEGER(sRownamesFlag)[0];
+  int nrow = asInteger(sNrow);
+  int ncol = asInteger(sNcol);
+  int rownamesFlag = asInteger(sRownamesFlag);
+  if (TYPEOF(sSep) != STRSXP || LENGTH(sSep) != 1)
+    Rf_error("sep must be a single string");
   char sep = CHAR(STRING_ELT(sSep, 0))[0];
+  if (TYPEOF(sNsep) != STRSXP || LENGTH(sNsep) != 1)
+    Rf_error("nsep must be a single string");
   char nsep = CHAR(STRING_ELT(sNsep, 0))[0];
   char lend = '\n';
   SEXPTYPE what = TYPEOF(sMat);
   SEXP sRnames = Rf_getAttrib(sMat, R_DimNamesSymbol);
-  if (!isNull(sRnames)) {
-    sRnames = VECTOR_ELT(sRnames,0);
-  } else {
-    sRnames = allocVector(STRSXP, nrow);
-  }
+  sRnames = isNull(sRnames) ? 0 : VECTOR_ELT(sRnames,0);
 
   int row_len = 0;
   int buf_len = 0;
@@ -58,6 +64,7 @@ SEXP as_output_matrix(SEXP sMat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNsep, 
   buf_len = row_len*nrow+1;
 
   char * buf = (char *) malloc(buf_len);
+  if (!buf) Rf_error("out of memory");
   int buf_pos = 0;
   int i, j;
   int ssize = 0;
@@ -65,16 +72,21 @@ SEXP as_output_matrix(SEXP sMat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNsep, 
   for (i=0; i < nrow; i++)
   {
     if (rownamesFlag) {
-      ssize = LENGTH(STRING_ELT(sRnames, i));
-      if (ssize + buf_pos + row_len > buf_len) {
-        buf_len = 2*buf_len + ssize + row_len;
-        char * tmp = realloc(buf, buf_len);
-        if (tmp != NULL) {
-          buf = tmp;
-        } else Rf_error("out of memory");
+      if (sRnames) {
+	ssize = LENGTH(STRING_ELT(sRnames, i));
+	if (ssize + buf_pos + row_len > buf_len) {
+	  buf_len = 2*buf_len + ssize + row_len;
+	  char * tmp = realloc(buf, buf_len);
+	  if (tmp != NULL) {
+	    buf = tmp;
+	  } else {
+	    free(buf);
+	    Rf_error("out of memory");
+	  }
+	}
+	memcpy(buf + buf_pos, CHAR(STRING_ELT(sRnames, i)), ssize);
+	buf_pos += ssize;
       }
-      memcpy(buf + buf_pos, CHAR(STRING_ELT(sRnames, i)), ssize);
-      buf_pos += ssize;
       buf[buf_pos] = nsep;
       buf_pos++;
     }
@@ -128,7 +140,10 @@ SEXP as_output_matrix(SEXP sMat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNsep, 
             char * tmp = realloc(buf, buf_len);
             if (tmp != NULL) {
               buf = tmp;
-            } else Rf_error("out of memory");
+            } else {
+	      free(buf);
+	      Rf_error("out of memory");
+	    }
           }
           memcpy(buf + buf_pos, CHAR(STRING_ELT(sMat, i + j*nrow)), ssize);
           buf_pos += ssize;
@@ -144,36 +159,40 @@ SEXP as_output_matrix(SEXP sMat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNsep, 
     buf[buf_pos-1] = lend;
   }
 
-  /* Is there a better way to do this? */
   SEXP res = PROTECT(allocVector(RAWSXP, buf_pos));
-  for (i=0; i < buf_pos; i++)
-  {
-    RAW(res)[i] = buf[i];
-  }
+  memcpy(RAW(res), buf, buf_pos);
 
   free(buf);
   UNPROTECT(1);
   return res;
 }
 
+/* getAttrib() is broken when trying to access R_RowNamesSymbol
+   in more recent R versions so we have to work around that ourselves */
+static SEXP getAttrib0(SEXP vec, SEXP name) {
+  SEXP s;
+  for (s = ATTRIB(vec); s != R_NilValue; s = CDR(s))
+    if (TAG(s) == name) return CAR(s);
+  return R_NilValue;
+}
+
 SEXP as_output_dataframe(SEXP sData, SEXP sWhat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNsep, SEXP sRownamesFlag) {
   int i, j;
-  int nrow = INTEGER(sNrow)[0];
-  int ncol = INTEGER(sNcol)[0];
-  int len = nrow * ncol;
-  int rownamesFlag = INTEGER(sRownamesFlag)[0];
+  int nrow = asInteger(sNrow);
+  int ncol = asInteger(sNcol);
+  int rownamesFlag = asInteger(sRownamesFlag);
+  if (TYPEOF(sSep) != STRSXP || LENGTH(sSep) != 1)
+    Rf_error("sep must be a single string");
+  if (TYPEOF(sNsep) != STRSXP || LENGTH(sNsep) != 1)
+    Rf_error("nsep must be a single string");
   char sep = CHAR(STRING_ELT(sSep, 0))[0];
   char nsep = CHAR(STRING_ELT(sNsep, 0))[0];
   char lend = '\n';
-  SEXP sRnames = Rf_getAttrib(sData, R_DimNamesSymbol);
-  if (!isNull(sRnames)) {
-    sRnames = VECTOR_ELT(sRnames,0);
-  } else {
-    sRnames = allocVector(STRSXP, nrow);
-  }
-
+  SEXP sRnames = getAttrib0(sData, R_RowNamesSymbol);
   int row_len = 0;
   int buf_len = 0;
+  if (TYPEOF(sRnames) != STRSXP) sRnames = NULL;
+
   for (j = 0; j < ncol; j++) {
     switch (TYPEOF(VECTOR_ELT(sWhat,j))) {
       case LGLSXP:
@@ -215,17 +234,24 @@ SEXP as_output_dataframe(SEXP sData, SEXP sWhat, SEXP sNrow, SEXP sNcol, SEXP sS
 
   for (i=0; i < nrow; i++)
   {
-    if (rownamesFlag == 1) {
-      ssize = LENGTH(STRING_ELT(sRnames, i));
-      if (ssize + buf_pos + row_len > buf_len) {
-        buf_len = 2*buf_len + ssize + row_len;
-        char * tmp = realloc(buf, buf_len);
-        if (tmp != NULL) {
-          buf = tmp;
-        } else Rf_error("out of memory");
+    if (rownamesFlag) {
+      if (sRnames) {
+	ssize = LENGTH(STRING_ELT(sRnames, i));
+	if (ssize + buf_pos + row_len > buf_len) {
+	  buf_len = 2*buf_len + ssize + row_len;
+	  char * tmp = realloc(buf, buf_len);
+	  if (tmp != NULL) {
+	    buf = tmp;
+	  } else {
+	    free(buf);
+	    Rf_error("out of memory");
+	  }
+	}
+	memcpy(buf + buf_pos, CHAR(STRING_ELT(sRnames, i)), ssize);
+	buf_pos += ssize;
+      } else {
+	/* FIXME: use sprintf("%d", i) for automatic row names? */
       }
-      memcpy(buf + buf_pos, CHAR(STRING_ELT(sRnames, i)), ssize);
-      buf_pos += ssize;
       buf[buf_pos] = nsep;
       buf_pos++;
     }
@@ -279,7 +305,10 @@ SEXP as_output_dataframe(SEXP sData, SEXP sWhat, SEXP sNrow, SEXP sNcol, SEXP sS
             char * tmp = realloc(buf, buf_len);
             if (tmp != NULL) {
               buf = tmp;
-            } else Rf_error("out of memory");
+            } else {
+	      free(buf);
+	      Rf_error("out of memory");
+	    }
           }
           memcpy(buf + buf_pos, CHAR(STRING_ELT(VECTOR_ELT(sData,j), i)), ssize);
           buf_pos += ssize;
@@ -295,28 +324,22 @@ SEXP as_output_dataframe(SEXP sData, SEXP sWhat, SEXP sNrow, SEXP sNcol, SEXP sS
     buf[buf_pos-1] = lend;
   }
 
-  /* Is there a better way to do this? */
-  SEXP res = PROTECT(allocVector(RAWSXP, buf_pos));
-  for (i=0; i < buf_pos; i++)
-  {
-    RAW(res)[i] = buf[i];
-  }
-
+  SEXP res = allocVector(RAWSXP, buf_pos);
+  memcpy(RAW(res), buf, buf_pos);
   free(buf);
-  UNPROTECT(1);
   return res;
 }
 
 SEXP as_output_vector(SEXP sVector, SEXP sLen, SEXP sNsep, SEXP sNamesFlag) {
   int len = INTEGER(sLen)[0];
-  int namesFlag = INTEGER(sNamesFlag)[0];
+  int namesFlag = asInteger(sNamesFlag);
+  if (TYPEOF(sNsep) != STRSXP || LENGTH(sNsep) != 1)
+    Rf_error("nsep must be a single string");
   char nsep = CHAR(STRING_ELT(sNsep, 0))[0];
   char lend = '\n';
   SEXPTYPE what = TYPEOF(sVector);
   SEXP sRnames = Rf_getAttrib(sVector, R_NamesSymbol);
-  if (isNull(sRnames)) {
-    sRnames = allocVector(STRSXP, len);
-  }
+  if (isNull(sRnames)) sRnames = 0;
 
   int row_len = 0;
   int buf_len = 0;
@@ -354,22 +377,27 @@ SEXP as_output_vector(SEXP sVector, SEXP sLen, SEXP sNsep, SEXP sNamesFlag) {
 
   char * buf = (char *) malloc(buf_len);
   int buf_pos = 0;
-  int i, j;
+  int i;
   int ssize = 0;
 
   for (i=0; i < len; i++)
   {
     if (namesFlag) {
-      ssize = LENGTH(STRING_ELT(sRnames, i));
-      if (ssize + buf_pos + row_len > buf_len) {
-        buf_len = 2*buf_len + ssize + row_len;
-        char * tmp = realloc(buf, buf_len);
-        if (tmp != NULL) {
-          buf = tmp;
-        } else Rf_error("out of memory");
+      if (sRnames) {
+	ssize = LENGTH(STRING_ELT(sRnames, i));
+	if (ssize + buf_pos + row_len > buf_len) {
+	  buf_len = 2*buf_len + ssize + row_len;
+	  char * tmp = realloc(buf, buf_len);
+	  if (tmp != NULL) {
+	    buf = tmp;
+	  } else {
+	    free(buf);
+	    Rf_error("out of memory");
+	  }
+	}
+	memcpy(buf + buf_pos, CHAR(STRING_ELT(sRnames, i)), ssize);
+	buf_pos += ssize;
       }
-      memcpy(buf + buf_pos, CHAR(STRING_ELT(sRnames, i)), ssize);
-      buf_pos += ssize;
       buf[buf_pos] = nsep;
       buf_pos++;
     }
@@ -422,7 +450,10 @@ SEXP as_output_vector(SEXP sVector, SEXP sLen, SEXP sNsep, SEXP sNamesFlag) {
           char * tmp = realloc(buf, buf_len);
           if (tmp != NULL) {
             buf = tmp;
-          } else Rf_error("out of memory");
+          } else {
+	    free(buf);
+	    Rf_error("out of memory");
+	  }
         }
         memcpy(buf + buf_pos, CHAR(STRING_ELT(sVector, i)), ssize);
         buf_pos += ssize;
@@ -437,12 +468,8 @@ SEXP as_output_vector(SEXP sVector, SEXP sLen, SEXP sNsep, SEXP sNamesFlag) {
     buf_pos++;
   }
 
-  /* Is there a better way to do this? */
-  SEXP res = PROTECT(allocVector(RAWSXP, buf_pos));
-  for (i=0; i < buf_pos; i++)
-  {
-    RAW(res)[i] = buf[i];
-  }
+  SEXP res = allocVector(RAWSXP, buf_pos);
+  memcpy(RAW(res), buf, buf_pos);
 
   free(buf);
   UNPROTECT(1);

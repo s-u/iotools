@@ -12,10 +12,6 @@ as.output.data.frame <- function(x, sep = "|", nsep="\t", rownamesFlag=TRUE, ...
   if (ncol(x) == 1L)
     return(as.output.default(x[,1]))
 
-  rownamesFlag = as.logical(rownamesFlag)
-  if (rownamesFlag && .row_names_info(x) < 0L)
-    rownamesFlag = 2L
-
   colClasses = sapply(x, class)
   known <- colClasses %in% c("logical", "integer", "numeric", "complex", "character", "raw")
   for (j in (1:ncol(x))[!known])
@@ -23,11 +19,11 @@ as.output.data.frame <- function(x, sep = "|", nsep="\t", rownamesFlag=TRUE, ...
   colClasses[!known] = "character"
   what = sapply(colClasses, do.call, list(0))
   .Call(as_output_dataframe, x, what, nrow(x), ncol(x), as.character(sep),
-        as.character(nsep), as.integer(rownamesFlag))
+        as.character(nsep), rownamesFlag)
 }
 
-as.output.list <- function(x, ...)
-  paste(names(x), sapply(x, function (e) paste(as.character(e), collapse='|')), sep='\t')
+as.output.list <- function(x, sep="|", nsep="\t", ...)
+  paste(names(x), sapply(x, function (e) paste(as.character(e), collapse=sep)), sep=nsep)
 
 as.output.matrix <- function(x, sep="|", nsep="\t", rownamesFlag, ...) {
   if (missing(rownamesFlag)) rownamesFlag = !is.null(dimnames(x))
@@ -35,6 +31,5 @@ as.output.matrix <- function(x, sep="|", nsep="\t", rownamesFlag, ...) {
         as.character(nsep), as.logical(rownamesFlag))
 }
 
-as.output.table <- function(x, nsep="\t", namesFlag=TRUE, ...) {
+as.output.table <- function(x, nsep="\t", namesFlag=TRUE, ...)
   .Call(as_output_vector, x, length(x), as.character(nsep), as.logical(names))
-}
