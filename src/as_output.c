@@ -61,7 +61,7 @@ SEXP dybuf_collect(SEXP s) {
   dst = (char*) RAW(res = PROTECT(allocVector(RAWSXP, total)));
   head = VECTOR_ELT(s, 0);
   while (d->tail != head) {
-    int l = LENGTH(CAR(HEAD));
+    int l = LENGTH(CAR(head));
     memcpy(dst, RAW(CAR(head)), l);
     dst += l;
     head = CDR(head);
