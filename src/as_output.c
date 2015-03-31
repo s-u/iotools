@@ -29,6 +29,7 @@ void dybuf_add(SEXP s, const char *data, unsigned long len) {
   dybuf_info_t *d = (dybuf_info_t*) RAW(VECTOR_ELT(s, 1));
   unsigned long n = (d->pos + len > d->size) ? (d->size - d->pos) : len;
   if (!len) return;
+  /* printf("[%lu/%lu] %lu\n", d->pos, d->size, len); */
   if (n) {
     memcpy(RAW(CAR(d->tail)) + d->pos, data, n);
     d->pos += n;
@@ -36,12 +37,14 @@ void dybuf_add(SEXP s, const char *data, unsigned long len) {
     data += n;
     len -= n;
   }
+  /* printf("[%lu/%lu] filled, need %lu more", d->pos, d->size, len); */
   /* need more buffers */
   {
     SEXP nb;
     /* FIXME: we mostly assume that individual buffers are
        not long vectors so we should guard against that */
-    while (len > d->size) len *= 2;
+    while (len > d->size) d->size *= 2;
+    /* printf(", creating %lu more\n", d->size); */
     d->tail = SETCDR(d->tail, list1(nb = allocVector(RAWSXP, d->size)));
     memcpy(RAW(nb), data, len);
     d->pos = len;
@@ -67,7 +70,7 @@ SEXP dybuf_collect(SEXP s) {
     head = CDR(head);
   }
   if (d->pos) memcpy(dst, RAW(CAR(head)), d->pos);
-  UNPROTECT(res);
+  UNPROTECT(1);
   return res;
 }
 
