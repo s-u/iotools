@@ -51,6 +51,18 @@ void dybuf_add(SEXP s, const char *data, unsigned long len) {
   }
 }
 
+/* this is just a slightly faster version for single byte adds */
+void dybuf_add1(SEXP s, char x) {
+    dybuf_info_t *d = (dybuf_info_t*) RAW(VECTOR_ELT(s, 1));
+    if (d->pos < d->size) {
+	char *r = (char*) RAW(CAR(d->tail));
+	r[d->pos++] = x;
+	return;
+    }
+    /* fall back to the regular version if alloc is needed */
+    dybuf_add(s, &x, 1);
+}
+
 SEXP dybuf_collect(SEXP s) {
   dybuf_info_t *d = (dybuf_info_t*) RAW(VECTOR_ELT(s, 1));
   unsigned long total = 0;
@@ -74,164 +86,144 @@ SEXP dybuf_collect(SEXP s) {
   return res;
 }
 
+/* those are just rough estimates - we'll resize as needed but this
+   will give the right order of magnitude. In fact it's better to
+   underestimate than overestimate grossly. */
+static int guess_size(SEXPTYPE type) {
+    switch (type) {
+    case LGLSXP:  return 2;
+    case INTSXP:  return 5;
+    case REALSXP: return 6;
+    case CPLXSXP: return 12;
+    case STRSXP:  return 5;
+    case RAWSXP:  return 3;
+    default:
+	Rf_error("Unsupported input to what.");
+    }
+    return 0; /* unreachable */
+}
 
-/* FIXME: all the code below breaks on 32-bit overflows - we need to re-write it
-   both with long vector support and 64-bit accumulators
-
-   FIXME: the functions use realloc instead of buffer chains, that will result in
-   memory fragmentation; also it uses malloc() instead of R memory pools */
-
-SEXP as_output_matrix(SEXP sMat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNsep, SEXP sRownamesFlag) {
-  int nrow = asInteger(sNrow);
-  int ncol = asInteger(sNcol);
-  int rownamesFlag = asInteger(sRownamesFlag);
-  if (TYPEOF(sSep) != STRSXP || LENGTH(sSep) != 1)
-    Rf_error("sep must be a single string");
-  char sep = CHAR(STRING_ELT(sSep, 0))[0];
-  if (TYPEOF(sNsep) != STRSXP || LENGTH(sNsep) != 1)
-    Rf_error("nsep must be a single string");
-  char nsep = CHAR(STRING_ELT(sNsep, 0))[0];
-  char lend = '\n';
-  SEXPTYPE what = TYPEOF(sMat);
-  SEXP sRnames = Rf_getAttrib(sMat, R_DimNamesSymbol);
-  sRnames = isNull(sRnames) ? 0 : VECTOR_ELT(sRnames,0);
-
-  int row_len = 0;
-  int buf_len = 0;
-  switch (what) {
+static void store(SEXP buf, SEXP what, R_xlen_t i) {
+    char stbuf[64];
+    switch (TYPEOF(what)) {
     case LGLSXP:
-      row_len += 2*ncol;
-      break;
-
+	{
+	    int v;
+	    if ((v = INTEGER(what)[i]) == NA_INTEGER)
+		dybuf_add(buf, "NA", 2);
+	    else
+		dybuf_add1(buf, v ? 'T' : 'F');
+	    break;
+	}
+	
     case INTSXP:
-      row_len += 11*ncol;
-      break;
+	{
+	    int v;
+	    if ((v = INTEGER(what)[i]) == NA_INTEGER)
+		dybuf_add(buf, "NA", 2);
+	    else {
+		v = snprintf(stbuf, sizeof(stbuf), "%d", INTEGER(what)[i]);
+		dybuf_add(buf, stbuf, v);
+	    }
+	    break;
+	}
 
     case REALSXP:
-      row_len += 23*ncol;
-      break;
-
+	{
+	    double v;
+	    if (ISNA((v = REAL(what)[i])))
+		dybuf_add(buf, "NA", 2);
+	    else {
+		int n = snprintf(stbuf, sizeof(stbuf), "%.15g", v);
+		dybuf_add(buf, stbuf, n);
+	    }
+	    break;
+	}
+	
     case CPLXSXP:
-      row_len += 48*ncol;
-      break;
+	{
+	    double v;
+	    if (ISNA((v = COMPLEX(what)[i].r)))
+		dybuf_add(buf, "NA", 2);
+	    else {
+		int n = snprintf(stbuf, sizeof(stbuf), "%.15g%+.15gi",
+				 v, COMPLEX(what)[i].i);
+		dybuf_add(buf, stbuf, n);
+	    }
+	    break;
+	}
 
     case STRSXP:
-      row_len += 1;
-      break;
+	{
+	    /* FIXME: should we supply an option how to represent NA strings? */
+	    if (STRING_ELT(what, i) == R_NaString)
+		dybuf_add(buf, "NA", 2);
+	    else {
+		/* FIXME: should we use a defined encoding? */
+		const char *c = CHAR(STRING_ELT(what, i));
+		dybuf_add(buf, c, strlen(c));
+	    }
+	    break;
+	}
 
     case RAWSXP:
-      row_len += 3*ncol;
-      break;
-
-    default:
-      Rf_error("Unsupported input to what.");
-      break;
-  }
-  if (rownamesFlag) row_len++;
-  buf_len = row_len*nrow+1;
-
-  char * buf = (char *) malloc(buf_len);
-  if (!buf) Rf_error("out of memory");
-  int buf_pos = 0;
-  int i, j;
-  int ssize = 0;
-
-  for (i=0; i < nrow; i++)
-  {
-    if (rownamesFlag) {
-      if (sRnames) {
-	ssize = LENGTH(STRING_ELT(sRnames, i));
-	if (ssize + buf_pos + row_len > buf_len) {
-	  buf_len = 2*buf_len + ssize + row_len;
-	  char * tmp = realloc(buf, buf_len);
-	  if (tmp != NULL) {
-	    buf = tmp;
-	  } else {
-	    free(buf);
-	    Rf_error("out of memory");
-	  }
+	{
+	    int n = snprintf(stbuf, sizeof(stbuf), "%02x", RAW(what)[i]);
+	    dybuf_add(buf, stbuf, n);
+	    break;
 	}
-	memcpy(buf + buf_pos, CHAR(STRING_ELT(sRnames, i)), ssize);
-	buf_pos += ssize;
-      }
-      buf[buf_pos] = nsep;
-      buf_pos++;
     }
+}
 
-    for (j = 0; j < ncol; j++) {
-      switch (what) {
-        case LGLSXP:
-          if (INTEGER(sMat)[i + j*nrow] == NA_INTEGER)
-          {
-            buf_pos += snprintf(buf + buf_pos, 2, "%c%c", 'N', 'A');
-          } else if (INTEGER(sMat)[i + j*nrow] == 0) {
-            buf_pos += snprintf(buf + buf_pos, 2, "%c", 'T');
-          } else {
-            buf_pos += snprintf(buf + buf_pos, 2, "%c", 'F');
-          }
-          break;
+/* FIXME: all the code below breaks on 32-bit overflows - we need to re-write it
+   both with long vector support and 64-bit accumulators */
+SEXP as_output_matrix(SEXP sMat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNsep, SEXP sRownamesFlag) {
+    int nrow = asInteger(sNrow);
+    int ncol = asInteger(sNcol);
+    int rownamesFlag = asInteger(sRownamesFlag);
 
-        case INTSXP:
-          if (INTEGER(sMat)[i + j*nrow] == NA_INTEGER)
-          {
-            buf_pos += snprintf(buf + buf_pos, 3, "%c%c", 'N', 'A');
-          } else {
-            buf_pos += snprintf(buf + buf_pos, 11, "%d", INTEGER(sMat)[i + j*nrow]);
-          }
-          break;
+    if (TYPEOF(sSep) != STRSXP || LENGTH(sSep) != 1)
+	Rf_error("sep must be a single string");
+    if (TYPEOF(sNsep) != STRSXP || LENGTH(sNsep) != 1)
+	Rf_error("nsep must be a single string");
 
-        case REALSXP:
-          if (ISNA(REAL(sMat)[i + j*nrow]))
-          {
-            buf_pos += snprintf(buf + buf_pos, 3, "%c%c", 'N', 'A');
-          } else {
-            buf_pos += snprintf(buf + buf_pos, 23, "%.15g", REAL(sMat)[i + j*nrow]);
-          }
-          break;
+    char sep = CHAR(STRING_ELT(sSep, 0))[0];
+    char nsep = CHAR(STRING_ELT(sNsep, 0))[0];
+    char lend = '\n';
+    SEXPTYPE what = TYPEOF(sMat);
+    SEXP sRnames = Rf_getAttrib(sMat, R_DimNamesSymbol);
+    sRnames = isNull(sRnames) ? 0 : VECTOR_ELT(sRnames,0);
 
-        case CPLXSXP:
-          if (ISNA(COMPLEX(sMat)[i + j*nrow].r))
-          {
-            buf_pos += snprintf(buf + buf_pos, 3, "%c%c", 'N', 'A');
-          } else {
-            buf_pos += snprintf(buf + buf_pos, 48, "%.15g+%.15gi",
-                                  COMPLEX(sMat)[i + j*nrow].r,
-                                  COMPLEX(sMat)[i + j*nrow].i);
-          }
-          break;
+    unsigned long row_len = ((unsigned long) guess_size(what)) * (unsigned long) ncol;
+    
+    if (rownamesFlag) row_len += 8;
 
-        case STRSXP:
-          ssize = LENGTH(STRING_ELT(sMat, i + j*nrow));
-          if (ssize + buf_pos + row_len > buf_len) {
-            buf_len = 2*buf_len + ssize + row_len;
-            char * tmp = realloc(buf, buf_len);
-            if (tmp != NULL) {
-              buf = tmp;
-            } else {
-	      free(buf);
-	      Rf_error("out of memory");
+    SEXP buf = dybuf_alloc(row_len * nrow);
+    int i, j;
+  
+    for (i = 0; i < nrow; i++) {
+	if (rownamesFlag) {
+	    if (sRnames) {
+		const char *c = CHAR(STRING_ELT(sRnames, i));
+		dybuf_add(buf, c, strlen(c));
 	    }
-          }
-          memcpy(buf + buf_pos, CHAR(STRING_ELT(sMat, i + j*nrow)), ssize);
-          buf_pos += ssize;
-          break;
-
-        case RAWSXP:
-          buf_pos += snprintf(buf + buf_pos, 3, "%2.2x", RAW(sMat)[i + j*nrow]);
-          break;
-      }
-      buf[buf_pos] = sep;
-      buf_pos++;
+	}
+	dybuf_add1(buf, nsep);
+	
+	for (j = 0; j < ncol; j++) {
+	    R_xlen_t pos = j;
+	    pos *= nrow;
+	    pos += i;
+	    if (j) dybuf_add1(buf, sep);
+	    store(buf, sMat, pos);
+	}
+	dybuf_add1(buf, lend);
     }
-    buf[buf_pos-1] = lend;
-  }
 
-  SEXP res = PROTECT(allocVector(RAWSXP, buf_pos));
-  memcpy(RAW(res), buf, buf_pos);
 
-  free(buf);
-  UNPROTECT(1);
-  return res;
+    SEXP res = dybuf_collect(buf);
+    UNPROTECT(1); /* buffer */
+    return res;
 }
 
 /* getAttrib() is broken when trying to access R_RowNamesSymbol
