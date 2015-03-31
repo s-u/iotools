@@ -10,53 +10,52 @@
 
 /* we keep all our cached info in a raw vector with this layout */
 typedef struct dybuf_info {
-  unsigned long pos, size;
-  SEXP tail;
+    unsigned long pos, size;
+    char *data;
+    SEXP tail;
 } dybuf_info_t;
 
 /* NOTE: retuns a *protected* object */
 SEXP dybuf_alloc(unsigned long size) {
-  SEXP s = PROTECT(allocVector(VECSXP, 2));
-  SEXP r = SET_VECTOR_ELT(s, 0, list1(allocVector(RAWSXP, size)));
-  dybuf_info_t *d = (dybuf_info_t*) RAW(SET_VECTOR_ELT(s, 1, allocVector(RAWSXP, sizeof(dybuf_info_t))));
-  d->pos  = 0;
-  d->size = size;
-  d->tail = r;
-  return s;
+    SEXP s = PROTECT(allocVector(VECSXP, 2));
+    SEXP r = SET_VECTOR_ELT(s, 0, list1(allocVector(RAWSXP, size)));
+    dybuf_info_t *d = (dybuf_info_t*) RAW(SET_VECTOR_ELT(s, 1, allocVector(RAWSXP, sizeof(dybuf_info_t))));
+    d->pos  = 0;
+    d->size = size;
+    d->tail = r;
+    d->data = (char*) RAW(CAR(r));
+    return s;
 }
 
 void dybuf_add(SEXP s, const char *data, unsigned long len) {
-  dybuf_info_t *d = (dybuf_info_t*) RAW(VECTOR_ELT(s, 1));
-  unsigned long n = (d->pos + len > d->size) ? (d->size - d->pos) : len;
-  if (!len) return;
-  /* printf("[%lu/%lu] %lu\n", d->pos, d->size, len); */
-  if (n) {
-    memcpy(RAW(CAR(d->tail)) + d->pos, data, n);
-    d->pos += n;
-    if (len == n) return;
-    data += n;
-    len -= n;
-  }
-  /* printf("[%lu/%lu] filled, need %lu more", d->pos, d->size, len); */
-  /* need more buffers */
-  {
-    SEXP nb;
-    /* FIXME: we mostly assume that individual buffers are
-       not long vectors so we should guard against that */
-    while (len > d->size) d->size *= 2;
-    /* printf(", creating %lu more\n", d->size); */
-    d->tail = SETCDR(d->tail, list1(nb = allocVector(RAWSXP, d->size)));
-    memcpy(RAW(nb), data, len);
-    d->pos = len;
-  }
+    dybuf_info_t *d = (dybuf_info_t*) RAW(VECTOR_ELT(s, 1));
+    unsigned long n = (d->pos + len > d->size) ? (d->size - d->pos) : len;
+    if (!len) return;
+    /* printf("[%lu/%lu] %lu\n", d->pos, d->size, len); */
+    if (n) {
+	memcpy(d->data + d->pos, data, n);
+	d->pos += n;
+	if (len == n) return;
+	data += n;
+	len -= n;
+    }
+    /* printf("[%lu/%lu] filled, need %lu more", d->pos, d->size, len); */
+    /* need more buffers */
+    {
+	SEXP nb;
+	while (len > d->size) d->size *= 2;
+	/* printf(", creating %lu more\n", d->size); */
+	d->tail = SETCDR(d->tail, list1(nb = allocVector(RAWSXP, d->size)));
+	memcpy(d->data = (char*) RAW(nb), data, len);
+	d->pos = len;
+    }
 }
 
 /* this is just a slightly faster version for single byte adds */
 void dybuf_add1(SEXP s, char x) {
     dybuf_info_t *d = (dybuf_info_t*) RAW(VECTOR_ELT(s, 1));
     if (d->pos < d->size) {
-	char *r = (char*) RAW(CAR(d->tail));
-	r[d->pos++] = x;
+	d->data[d->pos++] = x;
 	return;
     }
     /* fall back to the regular version if alloc is needed */
@@ -64,26 +63,26 @@ void dybuf_add1(SEXP s, char x) {
 }
 
 SEXP dybuf_collect(SEXP s) {
-  dybuf_info_t *d = (dybuf_info_t*) RAW(VECTOR_ELT(s, 1));
-  unsigned long total = 0;
-  char *dst;
-  SEXP head = VECTOR_ELT(s, 0), res;
-  while (d->tail != head) {
-    total += LENGTH(CAR(head));
-    head = CDR(head);
-  }
-  total += d->pos;
-  dst = (char*) RAW(res = PROTECT(allocVector(RAWSXP, total)));
-  head = VECTOR_ELT(s, 0);
-  while (d->tail != head) {
-    int l = LENGTH(CAR(head));
-    memcpy(dst, RAW(CAR(head)), l);
-    dst += l;
-    head = CDR(head);
-  }
-  if (d->pos) memcpy(dst, RAW(CAR(head)), d->pos);
-  UNPROTECT(1);
-  return res;
+    dybuf_info_t *d = (dybuf_info_t*) RAW(VECTOR_ELT(s, 1));
+    unsigned long total = 0;
+    char *dst;
+    SEXP head = VECTOR_ELT(s, 0), res;
+    while (d->tail != head) {
+	total += LENGTH(CAR(head));
+	head = CDR(head);
+    }
+    total += d->pos;
+    dst = (char*) RAW(res = PROTECT(allocVector(RAWSXP, total)));
+    head = VECTOR_ELT(s, 0);
+    while (d->tail != head) {
+	int l = LENGTH(CAR(head));
+	memcpy(dst, RAW(CAR(head)), l);
+	dst += l;
+	head = CDR(head);
+    }
+    if (d->pos) memcpy(dst, RAW(CAR(head)), d->pos);
+    UNPROTECT(1);
+    return res;
 }
 
 /* those are just rough estimates - we'll resize as needed but this
