@@ -388,150 +388,35 @@ SEXP as_output_dataframe(SEXP sData, SEXP sWhat, SEXP sNrow, SEXP sNcol, SEXP sS
   return res;
 }
 
-SEXP as_output_vector(SEXP sVector, SEXP sLen, SEXP sNsep, SEXP sNamesFlag) {
-  int len = INTEGER(sLen)[0];
-  int namesFlag = asInteger(sNamesFlag);
-  if (TYPEOF(sNsep) != STRSXP || LENGTH(sNsep) != 1)
-    Rf_error("nsep must be a single string");
-  char nsep = CHAR(STRING_ELT(sNsep, 0))[0];
-  char lend = '\n';
-  SEXPTYPE what = TYPEOF(sVector);
-  SEXP sRnames = Rf_getAttrib(sVector, R_NamesSymbol);
-  if (isNull(sRnames)) sRnames = 0;
-
-  int row_len = 0;
-  int buf_len = 0;
-  switch (what) {
-    case LGLSXP:
-      row_len = 2;
-      break;
-
-    case INTSXP:
-      row_len = 11;
-      break;
-
-    case REALSXP:
-      row_len = 23;
-      break;
-
-    case CPLXSXP:
-      row_len = 48;
-      break;
-
-    case STRSXP:
-      row_len = 1;
-      break;
-
-    case RAWSXP:
-      row_len = 3;
-      break;
-
-    default:
-      Rf_error("Unsupported input to what.");
-      break;
-  }
-  if (namesFlag) row_len++;
-  buf_len = row_len*len+1;
-
-  char * buf = (char *) malloc(buf_len);
-  int buf_pos = 0;
-  int i;
-  int ssize = 0;
-
-  for (i=0; i < len; i++)
-  {
-    if (namesFlag) {
-      if (sRnames) {
-	ssize = LENGTH(STRING_ELT(sRnames, i));
-	if (ssize + buf_pos + row_len > buf_len) {
-	  buf_len = 2*buf_len + ssize + row_len;
-	  char * tmp = realloc(buf, buf_len);
-	  if (tmp != NULL) {
-	    buf = tmp;
-	  } else {
-	    free(buf);
-	    Rf_error("out of memory");
-	  }
+SEXP as_output_vector(SEXP sVector, SEXP sNsep, SEXP sNamesFlag) {
+    R_xlen_t len = XLENGTH(sVector), i;
+    int key_flag = asInteger(sNamesFlag);
+    if (TYPEOF(sNsep) != STRSXP || LENGTH(sNsep) != 1)
+	Rf_error("nsep must be a single string");
+    char nsep = CHAR(STRING_ELT(sNsep, 0))[0];
+    char lend = '\n';
+    SEXPTYPE what = TYPEOF(sVector);
+    SEXP sRnames = Rf_getAttrib(sVector, R_NamesSymbol);
+    if (isNull(sRnames)) sRnames = 0;
+    
+    unsigned long row_len = ((unsigned long) guess_size(what));
+    if (key_flag) row_len += 8;
+    
+    SEXP buf = dybuf_alloc(row_len);
+    
+    for (i = 0; i < len; i++) {
+	if (key_flag) {
+	    if (sRnames) {
+		const char *c = CHAR(STRING_ELT(sRnames, i));
+		dybuf_add(buf, c, strlen(c));
+	    }
+	    dybuf_add1(buf, nsep);
 	}
-	memcpy(buf + buf_pos, CHAR(STRING_ELT(sRnames, i)), ssize);
-	buf_pos += ssize;
-      }
-      buf[buf_pos] = nsep;
-      buf_pos++;
+	store(buf, sVector, i);
+	dybuf_add1(buf, lend);
     }
-
-    switch (what) {
-      case LGLSXP:
-        if (INTEGER(sVector)[i] == NA_INTEGER)
-        {
-          buf_pos += snprintf(buf + buf_pos, 2, "%c%c", 'N', 'A');
-        } else if (INTEGER(sVector)[i] == 0) {
-          buf_pos += snprintf(buf + buf_pos, 2, "%c", 'T');
-        } else {
-          buf_pos += snprintf(buf + buf_pos, 2, "%c", 'F');
-        }
-        break;
-
-      case INTSXP:
-        if (INTEGER(sVector)[i] == NA_INTEGER)
-        {
-          buf_pos += snprintf(buf + buf_pos, 3, "%c%c", 'N', 'A');
-        } else {
-          buf_pos += snprintf(buf + buf_pos, 11, "%d", INTEGER(sVector)[i]);
-        }
-        break;
-
-      case REALSXP:
-        if (ISNA(REAL(sVector)[i]))
-        {
-          buf_pos += snprintf(buf + buf_pos, 3, "%c%c", 'N', 'A');
-        } else {
-          buf_pos += snprintf(buf + buf_pos, 23, "%.15g", REAL(sVector)[i]);
-        }
-        break;
-
-      case CPLXSXP:
-        if (ISNA(COMPLEX(sVector)[i].r))
-        {
-          buf_pos += snprintf(buf + buf_pos, 3, "%c%c", 'N', 'A');
-        } else {
-          buf_pos += snprintf(buf + buf_pos, 48, "%.15g+%.15gi",
-                                COMPLEX(sVector)[i].r,
-                                COMPLEX(sVector)[i].i);
-        }
-        break;
-
-      case STRSXP:
-        ssize = LENGTH(STRING_ELT(sVector, i));
-        if (ssize + buf_pos + row_len > buf_len) {
-          buf_len = 2*buf_len + ssize + row_len;
-          char * tmp = realloc(buf, buf_len);
-          if (tmp != NULL) {
-            buf = tmp;
-          } else {
-	    free(buf);
-	    Rf_error("out of memory");
-	  }
-        }
-        memcpy(buf + buf_pos, CHAR(STRING_ELT(sVector, i)), ssize);
-        buf_pos += ssize;
-        break;
-
-      case RAWSXP:
-        buf_pos += snprintf(buf + buf_pos, 3, "%2.2x", RAW(sVector)[i]);
-        break;
-    }
-
-    buf[buf_pos] = lend;
-    buf_pos++;
-  }
-
-  SEXP res = allocVector(RAWSXP, buf_pos);
-  memcpy(RAW(res), buf, buf_pos);
-
-  free(buf);
-  UNPROTECT(1);
-  return res;
+    
+    SEXP res = dybuf_collect(buf);
+    UNPROTECT(1);
+    return res;
 }
-
-

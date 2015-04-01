@@ -1,16 +1,17 @@
 as.output <- function(x, ...) UseMethod("as.output")
 
-as.output.default <- function(x, nsep="\t", namesFlag, ...) {
-  if(missing(namesFlag)) namesFlag = !is.null(names(x))
+as.output.default <- function(x, nsep="\t", keys, ...) {
+  if(missing(keys)) keys <- !is.null(names(x))
   if (is.vector(x) && (mode(x) %in% c("numeric","character","integer","logical","complex","raw"))) {
-    return(.Call(as_output_vector, x, length(x), nsep, namesFlag))
+    return(.Call(as_output_vector, x, nsep, keys))
   }
   if (!namesFlag) as.character(x) else paste(names(x), as.character(x), sep=nsep)
 }
 
-as.output.data.frame <- function(x, sep = "|", nsep="\t", rownamesFlag=TRUE, ...) {
+as.output.data.frame <- function(x, sep = "|", nsep="\t", keys, ...) {
+  if(missing(keys)) keys <- !is.null(names(x))
   if (ncol(x) == 1L)
-    return(as.output.default(x[,1]))
+    return(as.output.default(x[,1], nsep=nsep, keys=keys, ...))
 
   colClasses = sapply(x, class)
   known <- colClasses %in% c("logical", "integer", "numeric", "complex", "character", "raw")
@@ -19,17 +20,17 @@ as.output.data.frame <- function(x, sep = "|", nsep="\t", rownamesFlag=TRUE, ...
   colClasses[!known] = "character"
   what = sapply(colClasses, do.call, list(0))
   .Call(as_output_dataframe, x, what, nrow(x), ncol(x), as.character(sep),
-        as.character(nsep), rownamesFlag)
+        as.character(nsep), keys)
 }
 
 as.output.list <- function(x, sep="|", nsep="\t", ...)
   paste(names(x), sapply(x, function (e) paste(as.character(e), collapse=sep)), sep=nsep)
 
-as.output.matrix <- function(x, sep="|", nsep="\t", rownamesFlag, ...) {
+as.output.matrix <- function(x, sep="|", nsep="\t", keys, ...) {
   if (missing(rownamesFlag)) rownamesFlag = !is.null(dimnames(x))
   .Call(as_output_matrix, x, nrow(x), ncol(x), as.character(sep),
-        as.character(nsep), as.logical(rownamesFlag))
+        as.character(nsep), keys)
 }
 
-as.output.table <- function(x, nsep="\t", namesFlag=TRUE, ...)
-  .Call(as_output_vector, x, length(x), as.character(nsep), as.logical(names))
+as.output.table <- function(x, nsep="\t", keys=TRUE, ...)
+  .Call(as_output_vector, x, as.character(nsep), keys)
