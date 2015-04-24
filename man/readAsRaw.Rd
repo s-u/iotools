@@ -11,19 +11,22 @@
 readAsRaw(con, n, nmax, fileEncoding="")
 }
 \arguments{
-  \item{con}{}
-  \item{n}{}
-  \item{nmax}{}
-  \item{fileEncoding}{}
-}
-\details{
+  \item{con}{A connection object or a character string naming a file
+    from which to save the output.}
+  \item{n}{Expected number of bytes to read. Set to \code{65536L} by
+    default when \code{con} is a connection, and set to the file size
+    by default when \code{con} is a character string.}
+  \item{nmax}{Maximum number of bytes to read; missing of \code{Inf}
+    to read in the entire connection.}
+  \item{fileEncoding}{When \code{con} is a connection, the file encoding
+    to use to open the connection.}
 }
 \value{
   \code{readAsRaw} returns a \code{raw} type which can then be consumed
-  by functions like \code{mstrsplit} and \code{dstrsplit}. 
+  by functions like \code{mstrsplit} and \code{dstrsplit}.
 }
 \author{
-  Taylor Arnold 
+  Taylor Arnold
 }
 \examples{
   mm <- model.matrix(~., iris)

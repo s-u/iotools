@@ -70,137 +70,72 @@ readAsRaw <- function (con, n, nmax, fileEncoding = "")
   return(ans)
 }
 
-read.table.raw = function (file, header = FALSE, sep = "", quote = "", dec = ".",
-    numerals = c("allow.loss", "warn.loss", "no.loss"), row.names,
-    col.names, as.is = TRUE, na.strings = "",
-    colClasses = NA, nrows = -1, skip = 0, check.names = TRUE,
-    fill = FALSE, strip.white = FALSE, blank.lines.skip = FALSE,
-    comment.char = "", allowEscapes = FALSE, flush = FALSE,
-    stringsAsFactors = FALSE, fileEncoding = "",
-    encoding = "unknown", text, skipNul = FALSE,
-    nrowsClasses = 10L, na.strings.Classes = "NA", nsep = NA, useScan = NA)
-{
+read.csv.raw = function(file, header=TRUE, sep=",", skip=0L, fileEncoding="",
+                        colClasses, nrows = -1L, nsep = NA, strict=TRUE,
+                        nrowsClasses = 25L) {
+
   # Read in data as a raw vector:
-  if (!missing(file)) {
-    r = readAsRaw(file,fileEncoding = fileEncoding)
-  } else if (!missing(text)) {
-    r = charToRaw(text)
-  } else {
+  if (missing(file))
     stop('argument "file" is missing, with no default')
-  }
 
-  if (missing(row.names)) row.names = NULL
-  if (!all(is.na(colClasses))) colClasses[colClasses %in% c("real", "double")] = "numeric"
+  if (!missing(colClasses) && is.list(colClasses))
+    colClasses = sapply(colClasses, function(v) class(v)[1])
 
-  # Check if we need to call scan with raw connection instead
-  if (sep == "" | quote != "" | allowEscapes | skipNul | !is.null(row.names) |
-      dec != "." | !all(as.is) | na.strings != "" | fill | strip.white |
-      blank.lines.skip | comment.char != "" | allowEscapes | flush |
-      stringsAsFactors | skipNul | !(encoding %in% c("", "unknown", "bytes", "UTF-8"))) {
-    if (is.na(useScan)) useScan = TRUE
-    if (!useScan) warning("Not able to avoid a call to scan given input parameters.")
-  } else if (is.na(useScan)) useScan = FALSE
-
+  r = readAsRaw(file, fileEncoding = fileEncoding)
+  if (!missing(colClasses) && !all(is.na(colClasses)))
+    colClasses[colClasses %in% c("real", "double")] = "numeric"
 
   # Run a small subset of the data through read.table:
-  subset = mstrsplit(r, sep=NA, nsep=nsep, nrows=nrowsClasses, skip=skip)
-  tc = textConnection(subset)
-  on.exit(close(tc), add=TRUE)
-  if (missing(col.names)) {
-    test = read.table(tc, header = header, sep = sep, quote = quote,
-      dec = dec, numerals = numerals, row.names = row.names, as.is = as.is,
-      na.strings = c(na.strings.Classes, na.strings), colClasses = colClasses,
-      nrows = nrows, skip = skip,
-      check.names = check.names, fill = fill, strip.white = strip.white,
-      blank.lines.skip = blank.lines.skip, comment.char = comment.char,
-      allowEscapes = allowEscapes, flush = flush, stringsAsFactors = stringsAsFactors,
-      fileEncoding = fileEncoding, encoding = encoding, skipNul = FALSE)
-  } else {
-    test = read.table(tc, header = header, sep = sep, quote = quote,
-      dec = dec, numerals = numerals, row.names = row.names, col.names = col.names, as.is = as.is,
-      na.strings = c(na.strings.Classes, na.strings), colClasses = colClasses,
-      nrows = nrows, skip = skip,
-      check.names = check.names, fill = fill, strip.white = strip.white,
-      blank.lines.skip = blank.lines.skip, comment.char = comment.char,
-      allowEscapes = allowEscapes, flush = flush, stringsAsFactors = stringsAsFactors,
-      fileEncoding = fileEncoding, encoding = encoding, skipNul = FALSE)
+  if (missing(colClasses)) {
+    subset = mstrsplit(r, sep=sep, nsep=nsep, nrows=nrowsClasses, skip=skip+header)
+
+    colClasses = rep(NA_character_, ncol(subset))
+    for (i in 1:ncol(subset))
+      colClasses[i] = class(type.convert(subset[,i],as.is=TRUE))
+
+    # If all NA's, R makes it logical; better to be character
+    index = which(apply(!is.na(subset), 2, sum) == 0)
+    if (length(index))
+      colClasses[index] = "character"
+
+    if (!is.na(nsep))
+      colClasses = colClasses[-1]
   }
 
-  if (!all(is.na(colClasses))) {
-    temp = unlist(lapply(test, function(v) class(v[[1]])[[1]]))
-    colClasses[colClasses != "NULL"] = temp
-    names(colClasses)[colClasses != "NULL"] = names(temp)
-  } else colClasses = unlist(lapply(test,function(v) class(v[[1]])[[1]]))
+  # Process header
+  if (header & is.null(names(colClasses))) {
+    col_names = mstrsplit(r, sep=sep, nsep=nsep, nrows=1)
+    if ((length(col_names) - 1 == length(colClasses)) && !is.na(nsep))
+      col_names = col_names[-1]
 
-  index = which(apply(!is.na(test), 2, sum) == 0L)
-  if (length(index)) colClasses[colClasses != "NULL"][index] = "character"
-  cols = sum(colClasses != "NULL")
-
-  # Set up column classes to use for calls to dstrsplit or scan
-  colClassesUse = rep_len("character", cols)
-  names(colClassesUse) = names(colClasses)
-  known = colClasses %in% c("logical", "integer", "numeric", "complex", "character", "raw")
-  colClassesUse[known] = colClasses[known]
-  colClassesUse[colClassesUse == "NULL"] = "NULL"
-  what = rep.int(list(""), cols)
-  what[known] <- sapply(colClassesUse[known], do.call, list(0))
-  what[colClasses %in% "NULL"] <- list(NULL)
-  keep = !sapply(what, is.null)
-
-  if (useScan) {
-    rc = rawConnection(r)
-    on.exit(close(rc), add=TRUE)
-    x = scan(rc, what = what,
-                 sep = sep, quote = quote, dec = dec, nmax = nrows, skip = skip + header,
-                 na.strings = na.strings, quiet = TRUE, fill = fill,
-                 strip.white = strip.white, blank.lines.skip = blank.lines.skip,
-                 multi.line = FALSE, comment.char = comment.char,
-                 allowEscapes = allowEscapes, flush = flush, encoding = encoding,
-                 skipNul = skipNul)
-    nlines = length(x[[which.max(keep)]])
-    row.names = .set_row_names(as.integer(nlines))
-    x = x[keep]
-    class(x) = "data.frame"
-    attr(x, "row.names") = row.names
-  } else {
-    what[colClasses %in% "POSIXct"] <- list(list())
-    known[colClasses %in% "POSIXct"] = TRUE
-    x = dstrsplit(r, col_types = colClassesUse, sep=sep, nsep=nsep,
-                   strict=FALSE, skip=skip + header, nrows=nrows)
+    names(colClasses) = col_names
   }
 
-  # Parse input to as.is:
-  if(is.logical(as.is)) {
-    as.is <- rep_len(as.is, cols)
-  } else if(is.numeric(as.is)) {
-    if(any(as.is < 1 | as.is > cols))
-      stop("invalid numeric 'as.is' expression")
-    i <- rep.int(FALSE, cols)
-    i[as.is] <- TRUE
-    as.is <- i
-  } else if(is.character(as.is)) {
-    i <- match(as.is, col.names, 0L)
-    if(any(i <= 0L))
-        warning("not all columns named in 'as.is' exist")
-    i <- i[i > 0L]
-    as.is <- rep.int(FALSE, cols)
-    as.is[i] <- TRUE
-  } else if (length(as.is) != cols)
-    stop(gettextf("'as.is' has the wrong length %d  != cols = %d",
-                  length(as.is), cols), domain = NA)
-
-  what = what[keep]; known = known[keep]
-  for (i in (1L:length(x))[!known]) {
-    x[[i]] <- if (is.na(colClasses[i]))
-        type.convert(x[[i]], as.is = as.is[i], dec = dec, na.strings = na.strings)
-    else if (colClasses[i] == "factor")
-        as.factor(x[[i]])
-    else if (colClasses[i] == "Date")
-        as.Date(x[[i]])
-    else if (colClasses[i] == "POSIXct")
-        as.POSIXct(x[[i]])
-    else methods::as(x[[i]], colClasses[i])
-  }
-
-  return(x)
+  dstrsplit(r, colClasses, sep = sep, nsep = nsep, strict = strict,
+            skip = skip+header, nrows = nrows)
 }
+
+read.delim.raw = function(file, header=TRUE, sep="\t", ...) {
+  read.csv.raw(file=file, header=header, sep=sep, ...)
+}
+
+write.csv.raw = function(x, file = "", append = FALSE, sep = ",", nsep="\t",
+                          col.names = TRUE, fileEncoding = "") {
+  if (is.character(file)) {
+    file <- if (nzchar(fileEncoding))
+            file(file, ifelse(append, "ab", "wb"), encoding = fileEncoding)
+        else file(file, ifelse(append, "ab", "wb"))
+    on.exit(close(file))
+  } else if (!isOpen(file, "w")) {
+    open(file, "wb")
+    on.exit(close(file))
+  }
+
+  r = as.output(x, sep = sep, nsep=nsep)
+  writeBin(r, con=file)
+}
+
+write.table.raw = function(x, file = "", sep = " ", ...) {
+  write.csv.raw(x, file=file, sep=sep, ...)
+}
+

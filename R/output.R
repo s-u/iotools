@@ -1,6 +1,6 @@
 as.output <- function(x, ...) UseMethod("as.output")
 
-as.output.default <- function(x, nsep="\t", keys, ...) {
+as.output.default <- function(x, nsep="\t", keys, namesFlag=TRUE,...) {
   if(missing(keys)) keys <- !is.null(names(x))
   if (is.vector(x) && (mode(x) %in% c("numeric","character","integer","logical","complex","raw"))) {
     return(.Call(as_output_vector, x, nsep, keys))
@@ -26,7 +26,8 @@ as.output.data.frame <- function(x, sep = "|", nsep="\t", keys, ...) {
 as.output.list <- function(x, sep="|", nsep="\t", ...)
   paste(names(x), sapply(x, function (e) paste(as.character(e), collapse=sep)), sep=nsep)
 
-as.output.matrix <- function(x, sep="|", nsep="\t", keys, ...) {
+as.output.matrix <- function(x, sep="|", nsep="\t", keys, rownamesFlag, ...) {
+  if(missing(keys)) keys <- !is.null(names(x))
   if (missing(rownamesFlag)) rownamesFlag = !is.null(dimnames(x))
   .Call(as_output_matrix, x, nrow(x), ncol(x), as.character(sep),
         as.character(nsep), keys)
