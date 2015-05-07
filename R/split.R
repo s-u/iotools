@@ -10,7 +10,7 @@ mstrsplit <- function(x, sep="|", nsep=NA, strict=TRUE, ncol = NA,
   if (!is.na(nsep) && (length(charToRaw(nsep)) != 1L)) stop("Seperator must one byte wide (i.e., ASCII).")
   type = do.call(match.arg(type), list(0))
 
-  if (length(x) == 0L) return(matrix(vector(mode=type)))
+  if (length(x) == 0L) return(matrix(type))
 
   .Call(mat_split, x, sep, nsep, !strict, ncol, type, as.integer(skip), as.integer(nrows))
 }
