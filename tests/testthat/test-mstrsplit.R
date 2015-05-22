@@ -23,22 +23,22 @@ expect_equal(class(out), "raw")
 expect_equal(mstrsplit(out,type="character"),test_matrix)
 
 # Raw matrix
-test_matrix = matrix(sample(state.abb, p*n, TRUE),ncol=p)
+test_matrix = matrix(charToRaw(paste(sample(letters,n*p,TRUE),collapse="")),ncol=p)
 out = as.output(test_matrix)
 expect_equal(class(out), "raw")
-expect_equal(mstrsplit(out,type="character"),test_matrix)
+expect_equal(mstrsplit(out,type="raw"),test_matrix)
 
 # Complex matrix
-test_matrix = matrix(sample(state.abb, p*n, TRUE),ncol=p)
+test_matrix = matrix(complex(n*p,runif(n*p),runif(n*p)),ncol=p)
 out = as.output(test_matrix)
 expect_equal(class(out), "raw")
-expect_equal(mstrsplit(out,type="character"),test_matrix)
+expect_equal(mstrsplit(out,type="complex"),test_matrix)
 
 # Logical matrix
-test_matrix = matrix(sample(state.abb, p*n, TRUE),ncol=p)
+test_matrix = matrix(runif(n*p) > 0.5,ncol=p)
 out = as.output(test_matrix)
 expect_equal(class(out), "raw")
-expect_equal(mstrsplit(out,type="character"),test_matrix)
+expect_equal(mstrsplit(out,type="logical"),test_matrix)
 
 
 # Matrix with comma seperator
