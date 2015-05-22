@@ -10,7 +10,7 @@ mstrsplit <- function(x, sep="|", nsep=NA, strict=TRUE, ncol = NA,
   if (!is.na(nsep) && (length(charToRaw(nsep)) != 1L)) stop("Seperator must one byte wide (i.e., ASCII).")
   type = do.call(match.arg(type), list(0))
 
-  if (length(x) == 0L) return(matrix(type))
+  if (length(x) == 0L) return(matrix(type,0L,0L))
 
   .Call(mat_split, x, sep, nsep, !strict, ncol, type, as.integer(skip), as.integer(nrows))
 }
@@ -32,6 +32,9 @@ dstrsplit <- function(x, col_types, sep="|", nsep=NA, strict=TRUE, skip=0L, nrow
     col_types <- c("character", col_types);
     col.names <- c("rowindex", col.names)
   }
+
+  if (length(x) == 0L)
+    return(data.frame(sapply(col_types,do.call,list(0)),stringsAsFactors=FALSE))
 
   ncol <- length(col_types)
   col_types[col_types %in% c("real", "double")] <- "numeric"

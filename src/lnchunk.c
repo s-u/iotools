@@ -43,7 +43,7 @@ SEXP create_chunk_reader(SEXP sConn, SEXP sMaxLine, SEXP sKeySep) {
     if (!inherits(sConn, "connection"))
 	Rf_error("invalid connection");
     if (max_line < 64) Rf_error("invalid max.line (must be at least 64)");
-    
+
     con = getConnection(asInteger(sConn));
     r = (chunk_read_t*) malloc(sizeof(chunk_read_t) + max_line);
     if (!r) Rf_error("Unable to allocate %.3fMb for line buffer", ((double) max_line) / (1024.0*1024.0));
@@ -282,7 +282,7 @@ SEXP chunk_tapply(SEXP sReader, SEXP sMaxSize, SEXP sMerge, SEXP sSep, SEXP sFUN
 	    if (CAR(cache) != R_NilValue) { /* anything to merge with ? */
 		SEXP nv, w = cache;
 		char *ptr;
-#if CHUNK_DEBUG		
+#if CHUNK_DEBUG
 		int total = 0, cid = 0;
 #endif
 		in_cache += hold; /* ok, have to alloc+copy, unfortunately */

@@ -114,7 +114,7 @@ static void store(SEXP buf, SEXP what, R_xlen_t i) {
 		dybuf_add1(buf, v ? 'T' : 'F');
 	    break;
 	}
-	
+
     case INTSXP:
 	{
 	    int v;
@@ -138,7 +138,7 @@ static void store(SEXP buf, SEXP what, R_xlen_t i) {
 	    }
 	    break;
 	}
-	
+
     case CPLXSXP:
 	{
 	    double v;
@@ -194,21 +194,22 @@ SEXP as_output_matrix(SEXP sMat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNsep, 
     sRnames = isNull(sRnames) ? 0 : VECTOR_ELT(sRnames,0);
 
     unsigned long row_len = ((unsigned long) guess_size(what)) * (unsigned long) ncol;
-    
+
     if (rownamesFlag) row_len += 8;
 
     SEXP buf = dybuf_alloc(row_len * nrow);
     int i, j;
-  
+
     for (i = 0; i < nrow; i++) {
 	if (rownamesFlag) {
 	    if (sRnames) {
 		const char *c = CHAR(STRING_ELT(sRnames, i));
 		dybuf_add(buf, c, strlen(c));
 	    }
+      dybuf_add1(buf, nsep);
 	}
-	dybuf_add1(buf, nsep);
-	
+
+
 	for (j = 0; j < ncol; j++) {
 	    R_xlen_t pos = j;
 	    pos *= nrow;
@@ -321,9 +322,9 @@ SEXP as_output_dataframe(SEXP sData, SEXP sWhat, SEXP sNrow, SEXP sNcol, SEXP sS
           {
             buf_pos += snprintf(buf + buf_pos, 2, "%c%c", 'N', 'A');
           } else if (INTEGER(VECTOR_ELT(sData,j))[i] == 0) {
-            buf_pos += snprintf(buf + buf_pos, 2, "%c", 'T');
-          } else {
             buf_pos += snprintf(buf + buf_pos, 2, "%c", 'F');
+          } else {
+            buf_pos += snprintf(buf + buf_pos, 2, "%c", 'T');
           }
           break;
 
@@ -398,12 +399,12 @@ SEXP as_output_vector(SEXP sVector, SEXP sNsep, SEXP sNamesFlag) {
     SEXPTYPE what = TYPEOF(sVector);
     SEXP sRnames = Rf_getAttrib(sVector, R_NamesSymbol);
     if (isNull(sRnames)) sRnames = 0;
-    
+
     unsigned long row_len = ((unsigned long) guess_size(what));
     if (key_flag) row_len += 8;
-    
+
     SEXP buf = dybuf_alloc(row_len);
-    
+
     for (i = 0; i < len; i++) {
 	if (key_flag) {
 	    if (sRnames) {
@@ -415,7 +416,7 @@ SEXP as_output_vector(SEXP sVector, SEXP sNsep, SEXP sNamesFlag) {
 	store(buf, sVector, i);
 	dybuf_add1(buf, lend);
     }
-    
+
     SEXP res = dybuf_collect(buf);
     UNPROTECT(1);
     return res;

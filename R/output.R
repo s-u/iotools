@@ -9,7 +9,10 @@ as.output.default <- function(x, nsep="\t", keys, namesFlag=TRUE,...) {
 }
 
 as.output.data.frame <- function(x, sep = "|", nsep="\t", keys, ...) {
-  if(missing(keys)) keys <- !is.null(names(x))
+  if(missing(keys)) {
+    keys <- (.row_names_info(x) > 0)
+    if (nrow(x) == 1 && rownames(x) == "1") keys <- FALSE
+  }
   if (ncol(x) == 1L)
     return(as.output.default(x[,1], nsep=nsep, keys=keys, ...))
 
@@ -26,9 +29,8 @@ as.output.data.frame <- function(x, sep = "|", nsep="\t", keys, ...) {
 as.output.list <- function(x, sep="|", nsep="\t", ...)
   paste(names(x), sapply(x, function (e) paste(as.character(e), collapse=sep)), sep=nsep)
 
-as.output.matrix <- function(x, sep="|", nsep="\t", keys, rownamesFlag, ...) {
-  if(missing(keys)) keys <- !is.null(names(x))
-  if (missing(rownamesFlag)) rownamesFlag = !is.null(dimnames(x))
+as.output.matrix <- function(x, sep="|", nsep="\t", keys, ...) {
+  if(missing(keys)) keys <- !is.null(rownames(x))
   .Call(as_output_matrix, x, nrow(x), ncol(x), as.character(sep),
         as.character(nsep), keys)
 }
