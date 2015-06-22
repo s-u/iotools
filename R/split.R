@@ -1,6 +1,6 @@
 mstrsplit <- function(x, sep="|", nsep=NA, strict=TRUE, ncol = NA,
                       type=c("character", "numeric", "logical", "integer",  "complex", "raw"),
-                      skip=0L, nrows=-1L) {
+                      skip=0L, nrows=-1L, quote="") {
   if (is.na(sep)) {
     sep = "\n"
     ncol = 1L
@@ -12,10 +12,11 @@ mstrsplit <- function(x, sep="|", nsep=NA, strict=TRUE, ncol = NA,
 
   if (length(x) == 0L) return(matrix(type,0L,0L))
 
-  .Call(mat_split, x, sep, nsep, !strict, ncol, type, as.integer(skip), as.integer(nrows))
+  .Call(mat_split, x, sep, nsep, !strict, ncol, type, as.integer(skip), as.integer(nrows),
+        quote)
 }
 
-dstrsplit <- function(x, col_types, sep="|", nsep=NA, strict=TRUE, skip=0L, nrows=-1L) {
+dstrsplit <- function(x, col_types, sep="|", nsep=NA, strict=TRUE, skip=0L, nrows=-1L, quote="") {
   if (is.na(sep)) {
     sep = "\n"
     ncol = 1L
@@ -49,7 +50,8 @@ dstrsplit <- function(x, col_types, sep="|", nsep=NA, strict=TRUE, skip=0L, nrow
   bad = sapply(what, function(v) length(v) != 0L)
   if (any(bad)) stop(paste0("Invalid input to col_types: ", col_types[bad]))
 
-  res = .Call(df_split, x, sep, nsep, !strict, ncol, what, col.names, as.integer(skip), as.integer(nrows))
+  res = .Call(df_split, x, sep, nsep, !strict, ncol, what, col.names, as.integer(skip), as.integer(nrows),
+             quote)
   return(res)
 }
 

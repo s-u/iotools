@@ -10,7 +10,7 @@
 \usage{
 mstrsplit(x, sep="|", nsep=NA, strict=TRUE, ncol = NA,
           type=c("character", "numeric", "logical", "integer",  "complex", "raw"),
-          skip=0L, nrows=-1L)
+          skip=0L, nrows=-1L, quote="")
 }
 \arguments{
   \item{x}{character vector (each element is treated as a row) or a raw
@@ -34,6 +34,9 @@ mstrsplit(x, sep="|", nsep=NA, strict=TRUE, ncol = NA,
   \item{nrows}{integer: the maximum number of rows to read in.  Negative and
     other invalid values are ignored, and indiate that the entire input
     should be processed.}
+  \item{quote}{the set of quoting characters as a length 1 vector. To disable
+          quoting altogether, use \code{quote = ""} (the default). Quoting
+          is only considered for columns read as character.}
 }
 \details{
   If the input is a raw vector, then it is interpreted as ASCII/UTF-8 content

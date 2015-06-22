@@ -9,7 +9,8 @@
   into a dataframe according to the separators.
 }
 \usage{
-dstrsplit(x, col_types, sep="|", nsep=NA, strict=TRUE, skip=0L, nrows=-1L)
+dstrsplit(x, col_types, sep="|", nsep=NA, strict=TRUE, skip=0L, nrows=-1L,
+          quote="")
 }
 \arguments{
   \item{x}{character vector (each element is treated as a row) or a
@@ -40,6 +41,9 @@ dstrsplit(x, col_types, sep="|", nsep=NA, strict=TRUE, skip=0L, nrows=-1L)
             beginning to read data.}
   \item{nrows}{integer: the maximum number of rows to read in.  Negative and
           other invalid values are ignored.}
+  \item{quote}{the set of quoting characters as a length 1 vector. To disable
+          quoting altogether, use \code{quote = ""} (the default). Quoting
+          is only considered for columns read as character.}
 }
 \details{
   If \code{nsep} is specified then all characters up to (but excluding)

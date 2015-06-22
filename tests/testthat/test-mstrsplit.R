@@ -73,3 +73,34 @@ expect_equal(class(out), "raw")
 expect_equal(length(out), 0L)
 expect_equal(mstrsplit(out,type="integer"),test_matrix)
 
+# Matrix with dos line endings:
+test_matrix = matrix(sample(state.abb, p*n, TRUE),ncol=p)
+test_matrix2 = test_matrix
+test_matrix2[,ncol(test_matrix2)] = paste0(test_matrix2[,ncol(test_matrix2)], "\r")
+out = as.output(test_matrix2)
+expect_equal(mstrsplit(out,type="character"),test_matrix)
+
+# Character matrix with quotes
+test_matrix = matrix(sample(state.abb, p*n, TRUE),ncol=p)
+test_matrix2 = test_matrix
+test_matrix2[,1] = paste0("'",test_matrix2[,1], "'")
+out = as.output(test_matrix2)
+expect_equal(mstrsplit(out,type="character", quote="'\""),test_matrix)
+
+# Character matrix bad quotes on first line
+test_matrix = matrix(sample(state.abb, p*n, TRUE),ncol=p)
+test_matrix2 = test_matrix
+test_matrix2[,1] = paste0("'",test_matrix2[,1])
+out = as.output(test_matrix2)
+expect_error(mstrsplit(out,type="character", quote="'\""),
+  "End of line within quote string on line 1; cannot determine num columns!")
+
+# Character matrix bad quotes on non-first line
+test_matrix = matrix(sample(state.abb, p*n, TRUE),ncol=p)
+test_matrix2 = test_matrix
+test_matrix2[-1,1] = paste0("'",test_matrix2[-1,1])
+out = as.output(test_matrix2)
+expect_warning(mstrsplit(out,type="character", quote="'\""),
+  "End of line within quoted string!")
+
+

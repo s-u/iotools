@@ -9,12 +9,12 @@
 double parse_ts(const char *c_start, const char *c_end);
 
 SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
-            SEXP sWhat, SEXP sColNames, SEXP sSkip, SEXP sNlines) {
+            SEXP sWhat, SEXP sColNames, SEXP sSkip, SEXP sNlines, SEXP sQuote) {
     char sep;
-    int nsep, use_ncol, resilient, ncol, i, j, k, len, nmsep_flag, skip;
+    int nsep, use_ncol, resilient, ncol, i, j, k, m, len, nmsep_flag, skip, quoteLen;
     unsigned int nrow;
     char num_buf[48];
-    const char *c, *sraw, *send;
+    const char *c, *c2, *sraw, *send, *quoteChars;;
     int nlines = INTEGER(sNlines)[0];
 
     SEXP sOutput, tmp, sOutputNames, st, clv;
@@ -30,6 +30,10 @@ SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
     ncol = use_ncol; /* NOTE: "character" is prepended by the R code if nmsep is TRUE,
                         so ncol *does* include the key column */
     skip = INTEGER(sSkip)[0];
+
+    /* parse quote information */
+    quoteChars = CHAR(STRING_ELT(sQuote, 0));
+    quoteLen = strlen(quoteChars);
 
     /* count non-NA columns */
     for (i = 0; i < use_ncol; i++)
@@ -194,7 +198,21 @@ SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
           break;
 
         case STRSXP:
-          SET_STRING_ELT(VECTOR_ELT(sOutput, j), k, Rf_mkCharLen(l, c - l));
+          c2 = c;
+          if (quoteLen) {
+            for (m = 0; m < quoteLen; m++) {
+              if (*l == quoteChars[m]) {
+                l++;
+                if (!(c2 = memchr(l, quoteChars[m], le - l))) {
+                  Rf_error("End of line within quoted string.");
+                } else {
+                  if (!(c = memchr(c2, (unsigned char) sep, le - c2)))
+                    c = le;
+                }
+              }
+            }
+          }
+          SET_STRING_ELT(VECTOR_ELT(sOutput, j), k, Rf_mkCharLen(l, c2 - l));
           j++;
           break;
 

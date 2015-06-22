@@ -46,3 +46,22 @@ expect_equal(class(out), "raw")
 expect_equal(length(out), 0L)
 expect_equal(dstrsplit(out,col_types=colClasses),test_df_empty)
 
+# Data frame with dos line endings:
+this_test_df = test_df
+this_test_df[,ncol(this_test_df)] = paste0(this_test_df[,ncol(this_test_df)], "\r")
+out = as.output(this_test_df)
+expect_equal(dstrsplit(out,col_types=colClasses),test_df)
+
+# Data frame with quotes around character column
+this_test_df = test_df
+this_test_df[,1] = paste0("'",this_test_df[,1], "'")
+out = as.output(this_test_df)
+expect_equal(dstrsplit(out,col_types=colClasses, quote="'\""),test_df)
+
+# Data frame with bad quotes
+this_test_df = test_df
+this_test_df[,1] = paste0("'", this_test_df[,1])
+out = as.output(this_test_df)
+expect_error(dstrsplit(out,col_types=colClasses, quote="'\""),
+  "End of line within quoted string.")
+

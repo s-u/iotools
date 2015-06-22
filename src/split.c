@@ -7,18 +7,18 @@
 #include "utils.h"
 
 SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
-               SEXP sWhat, SEXP sSkip, SEXP sNlines) {
-  unsigned int ncol = 1, nrow, np = 0, i, N, resilient = asInteger(sResilient);
+               SEXP sWhat, SEXP sSkip, SEXP sNlines, SEXP sQuote) {
+  unsigned int ncol = 1, nrow, np = 0, i, k, N, resilient = asInteger(sResilient);
   int use_ncol = asInteger(sNcol);
   int nsep = -1;
   int skip = INTEGER(sSkip)[0];
   int nlines = INTEGER(sNlines)[0];
-  int len;
+  int len, quoteLen;
   SEXP res, rnam, zerochar = 0;
   char sep;
   char num_buf[48];
   double * res_ptr;
-  const char *c, *sraw, *send, *l, *le;;
+  const char *c, *c2, *sraw, *send, *l, *le, *quoteChars;
 
   /* parse sep input */
   if (TYPEOF(sNamesSep) == STRSXP && LENGTH(sNamesSep) > 0)
@@ -26,6 +26,10 @@ SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
   if (TYPEOF(sSep) != STRSXP || LENGTH(sSep) < 1)
     Rf_error("invalid separator");
   sep = CHAR(STRING_ELT(sSep, 0))[0];
+
+  /* parse quote information */
+  quoteChars = CHAR(STRING_ELT(sQuote, 0));
+  quoteLen = strlen(quoteChars);
 
   /* check the input data */
   if (TYPEOF(s) == RAWSXP) {
@@ -61,16 +65,54 @@ SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
   /* count number of columns */
   if (use_ncol < 1) {
     if (TYPEOF(s) == RAWSXP) {
-      ncol = 1;
       c = sraw;
       le = memchr(sraw, '\n', send - sraw);
-      while ((c = memchr(c, (unsigned char) sep, le - c))) { ncol++; c++; }
+      if (TYPEOF(sWhat) == STRSXP && quoteLen) {
+        ncol = 0;
+        while(1)
+        {
+          ncol++;
+          for (k = 0; k < quoteLen; k++) {
+            if (*c == quoteChars[k]) {
+              c++;
+              if (! (c = memchr(c, quoteChars[k], le - c)))
+                Rf_error("End of line within quote string on line 1; cannot determine num columns!");
+              break; /* note: breaks inner 'for' loop, not 'if' statement */
+            }
+          }
+          if (!(c = (memchr(c, (unsigned char) sep, le - c))))
+            break;
+          c++;
+        }
+      } else {
+        ncol = 1;
+        while ((c = memchr(c, (unsigned char) sep, le - c))) { ncol++; c++; }
+      }
     } else {
       c = CHAR(STRING_ELT(s, 0));
-      while ((c = strchr(c, sep))) { ncol++; c++; }
-      /* if sep and nsep are the same then the first "column" is the key and not the column */
-      if (nsep == (int) (unsigned char) sep) ncol--;
+      if (TYPEOF(sWhat) == STRSXP && quoteLen) {
+        ncol = 0;
+        while(1)
+        {
+          ncol++;
+          for (k = 0; k < quoteLen; k++) {
+            if (*c == quoteChars[k]) {
+              c++;
+              if (!(c = strchr(c, quoteChars[k])))
+                Rf_error("End of line within quote string on line 1; cannot determine num columns!");
+              break; /* note: breaks inner 'for' loop, not 'if' statement */
+            }
+          }
+          if (!(c = (strchr(c, sep))))
+            break;
+          c++;
+        }
+      } else {
+        while ((c = strchr(c, sep))) { ncol++; c++; }
+      }
     }
+    /* if sep and nsep are the same then the first "column" is the key and not the column */
+    if (nsep == (int) (unsigned char) sep) ncol--;
   } else ncol = use_ncol;
 
   /* allocate space for the result */
@@ -174,7 +216,22 @@ SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
         break;
 
       case STRSXP:
-        SET_STRING_ELT(res, j, Rf_mkCharLen(l, c - l));
+        c2 = c;
+        if (quoteLen) {
+          for (k = 0; k < quoteLen; k++) {
+            if (*l == quoteChars[k]) {
+              l++;
+              if (!(c2 = memchr(l, quoteChars[k], le - l))) {
+                Rf_warning("End of line within quoted string!");
+                c = c2 = le;
+              } else {
+                if (!(c = memchr(c2, (unsigned char) sep, le - c2)))
+                  c = le;
+              }
+            }
+          }
+        }
+        SET_STRING_ELT(res, j, Rf_mkCharLen(l, c2 - l));
         break;
 
       case RAWSXP:
