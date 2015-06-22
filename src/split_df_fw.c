@@ -123,6 +123,7 @@ SEXP df_split_fw(SEXP s, SEXP sColWidths, SEXP sNamesSep,
           le = memchr(l, '\n', send - l);
           if (!le) le = send;
           sraw = le + 1;
+          if (*(le - 1) == '\r' ) le--; /* account for DOS-style '\r\n' */
       } else {
           l = CHAR(STRING_ELT(s, k + skip));
           le = l + strlen(l); /* probably lame, but using strings is way inefficeint anyway ;) */

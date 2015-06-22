@@ -106,6 +106,7 @@ SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
         le = memchr(l, '\n', send - l);
         if (!le) le = send;
         sraw = le + 1;
+        if (*(le - 1) == '\r' ) le--; /* account for DOS-style '\r\n' */
     } else {
         l = CHAR(STRING_ELT(s, i + skip));
         le = l + strlen(l);
