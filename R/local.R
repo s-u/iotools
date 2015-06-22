@@ -72,7 +72,7 @@ readAsRaw <- function (con, n, nmax, fileEncoding = "")
 
 read.csv.raw = function(file, header=TRUE, sep=",", skip=0L, fileEncoding="",
                         colClasses, nrows = -1L, nsep = NA, strict=TRUE,
-                        nrowsClasses = 25L) {
+                        nrowsClasses = 25L, quote="'\"") {
 
   # Read in data as a raw vector:
   if (missing(file))
@@ -112,7 +112,7 @@ read.csv.raw = function(file, header=TRUE, sep=",", skip=0L, fileEncoding="",
   }
 
   dstrsplit(r, colClasses, sep = sep, nsep = nsep, strict = strict,
-            skip = skip+header, nrows = nrows)
+            skip = skip+header, nrows = nrows, quote = quote)
 }
 
 read.delim.raw = function(file, header=TRUE, sep="\t", ...) {

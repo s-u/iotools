@@ -12,7 +12,7 @@
 \usage{
 read.csv.raw(file, header=TRUE, sep=",", skip=0L, fileEncoding="",
               colClasses, nrows = -1L, nsep = NA, strict=TRUE,
-              nrowsClasses = 25L)
+              nrowsClasses = 25L, quote="'\"")
 
 read.delim.raw(file, header=TRUE, sep="\t", ...)
 }
@@ -49,6 +49,9 @@ read.delim.raw(file, header=TRUE, sep="\t", ...)
     (e.g. more columns than expected) will cause an error.}
   \item{nrowsClasses}{integer. Maximum number of rows of data to read to learn column
     types. Not used when \code{col_types} is supplied. }
+  \item{quote}{the set of quoting characters as a length 1 vector. To disable
+          quoting altogether, use \code{quote = ""}. Quoting
+          is only considered for columns read as character.}
   \item{...}{additional parameters to pass to \code{read.csv.raw}}
 }
 \details{
