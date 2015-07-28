@@ -8,17 +8,18 @@
 
 SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
                SEXP sWhat, SEXP sSkip, SEXP sNlines, SEXP sQuote) {
-  unsigned int ncol = 1, nrow, np = 0, i, k, N, resilient = asInteger(sResilient);
+  unsigned int ncol = 1, np = 0, resilient = asInteger(sResilient);
+  unsigned long nrow, i, k, N, len, quoteLen;
   int use_ncol = asInteger(sNcol);
   int nsep = -1;
-  int skip = INTEGER(sSkip)[0];
-  int nlines = INTEGER(sNlines)[0];
-  int len, quoteLen;
-  SEXP res, rnam, zerochar = 0;
+  long skip = asLong(sSkip, 0);
+  long nlines = asLong(sNlines, -1);
+  SEXP res, rnam;
   char sep;
   char num_buf[48];
-  double * res_ptr;
-  const char *c, *c2, *sraw, *send, *l, *le, *quoteChars;
+  /* sraw/send is only used for raw vector parsing, but we have to set it to 0
+     to make gcc happy which cannot figure out that it's actually unused */
+  const char *c, *c2, *sraw = 0, *send = 0, *l, *le, *quoteChars;
 
   /* parse sep input */
   if (TYPEOF(sNamesSep) == STRSXP && LENGTH(sNamesSep) > 0)
@@ -37,11 +38,13 @@ SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
     sraw = (const char*) RAW(s);
     send = sraw + XLENGTH(s);
     if (nrow >= skip) {
-      nrow = nrow - skip;
-      for (i = 0; i < skip; i++) sraw = memchr(sraw,'\n',XLENGTH(s)) + 1;
+	unsigned long slen = XLENGTH(s);
+	nrow = nrow - skip;
+	i = 0;
+	while (i < skip && (sraw = memchr(sraw, '\n', slen))) { sraw++; i++; }
     } else {
-      nrow = 0;
-      sraw = send;
+	nrow = 0;
+	sraw = send;
     }
   } else if (TYPEOF(s) == STRSXP) {
     nrow = LENGTH(s);

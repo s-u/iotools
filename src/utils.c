@@ -1,15 +1,13 @@
-#include <Rinternals.h>
-#include <stdlib.h>
-#include <string.h>
-#include <errno.h>
+#define USE_RINTERNALS 1
+#include "utils.h"
 
 /* from tparse.c (which is based on code from fasttime) */
 double parse_ts(const char *c_start, const char *c_end);
 
-long count_lines(SEXP sRaw) {
+unsigned long count_lines(SEXP sRaw) {
     const char *c = (const char*) RAW(sRaw);
     const char *e = c + XLENGTH(sRaw);
-    long lines = 0;
+    unsigned long lines = 0;
     while ((c = memchr(c, '\n', e - c))) {
       lines++;
       c++;
@@ -18,13 +16,13 @@ long count_lines(SEXP sRaw) {
     return lines;
 }
 
-long count_lines_bounded(SEXP sRaw, int bound) {
+unsigned long count_lines_bounded(SEXP sRaw, unsigned long bound) {
     const char *c = (const char*) RAW(sRaw);
     const char *e = c + XLENGTH(sRaw);
-    long lines = 0;
+    unsigned long lines = 0;
     while ((c = memchr(c, '\n', e - c)) && lines < bound) {
-      lines++;
-      c++;
+	lines++;
+	c++;
     }
     if (e > c && e[-1] != '\n') lines++;
     return lines;
@@ -69,12 +67,6 @@ Rcomplex strtoc(const char *nptr, Rboolean NA)
       }
     }
     return z;
-}
-
-R_INLINE Rboolean Rspace(unsigned int c)
-{
-    if (c == ' ' || c == '\t' || c == '\n' || c == '\r') return TRUE;
-    return FALSE;
 }
 
 Rbyte strtoraw (const char *nptr)

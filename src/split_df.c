@@ -11,25 +11,25 @@ double parse_ts(const char *c_start, const char *c_end);
 SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
             SEXP sWhat, SEXP sColNames, SEXP sSkip, SEXP sNlines, SEXP sQuote) {
     char sep;
-    int nsep, use_ncol, resilient, ncol, i, j, k, m, len, nmsep_flag, skip, quoteLen;
-    unsigned int nrow;
+    int nsep, use_ncol, resilient, ncol;
+    long i, j, k, m, len, nmsep_flag, skip, quoteLen;
+    unsigned long nrow;
     char num_buf[48];
-    const char *c, *c2, *sraw, *send, *quoteChars;;
-    int nlines = INTEGER(sNlines)[0];
+    const char *c, *c2, *sraw = 0, *send = 0, *quoteChars;
+    long nlines = asLong(sNlines, -1);
 
     SEXP sOutput, tmp, sOutputNames, st, clv;
 
     /* Parse inputs */
     sep = CHAR(STRING_ELT(sSep, 0))[0];
-    if (TYPEOF(sNamesSep) == STRSXP && LENGTH(sNamesSep) > 0)
-      nsep = (int) (unsigned char) *CHAR(STRING_ELT(sNamesSep, 0));
-    else nsep = -1;
+    nsep = (TYPEOF(sNamesSep) == STRSXP && LENGTH(sNamesSep) > 0) ? ((int) (unsigned char) *CHAR(STRING_ELT(sNamesSep, 0))) : -1;
+
     nmsep_flag = (nsep > 0);
     use_ncol = asInteger(sNcol);
     resilient = asInteger(sResilient);
     ncol = use_ncol; /* NOTE: "character" is prepended by the R code if nmsep is TRUE,
                         so ncol *does* include the key column */
-    skip = INTEGER(sSkip)[0];
+    skip = asLong(sSkip, 0);
 
     /* parse quote information */
     quoteChars = CHAR(STRING_ELT(sQuote, 0));
@@ -37,31 +37,33 @@ SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
 
     /* count non-NA columns */
     for (i = 0; i < use_ncol; i++)
-      if (TYPEOF(VECTOR_ELT(sWhat,i)) == NILSXP) ncol--;
+	if (TYPEOF(VECTOR_ELT(sWhat,i)) == NILSXP) ncol--;
 
     /* check input */
     if (TYPEOF(s) == RAWSXP) {
-      nrow = (nlines >= 0) ? count_lines_bounded(s, nlines + skip) : count_lines(s);
-      sraw = (const char*) RAW(s);
-      send = sraw + XLENGTH(s);
-      if (nrow >= skip) {
-        nrow = nrow - skip;
-        for (i = 0; i < skip; i++) sraw = memchr(sraw,'\n',XLENGTH(s)) + 1;
-      } else {
-        nrow = 0;
-        sraw = send;
-      }
+	nrow = (nlines >= 0) ? count_lines_bounded(s, nlines + skip) : count_lines(s);
+	sraw = (const char*) RAW(s);
+	send = sraw + XLENGTH(s);
+	if (nrow >= skip) {
+	    unsigned long slen = XLENGTH(s);
+	    nrow = nrow - skip;
+	    i = 0;
+	    while (i < skip && (sraw = memchr(sraw, '\n', slen))) { sraw++; i++; }
+	} else {
+	    nrow = 0;
+	    sraw = send;
+	}
     } else if (TYPEOF(s) == STRSXP) {
-      nrow = LENGTH(s);
-      if (nrow >= skip) {
-        nrow -= skip;
-      } else {
-        skip = nrow;
-        nrow = 0;
-      }
-    } else {
-      Rf_error("invalid input to split - must be a raw or character vector");
-    }
+	nrow = XLENGTH(s);
+	if (nrow >= skip) {
+	    nrow -= skip;
+	} else {
+	    skip = nrow;
+	    nrow = 0;
+	}
+    } else
+	Rf_error("invalid input to split - must be a raw or character vector");
+
     if (nlines >= 0 && nrow > nlines) nrow = nlines;
 
     /* allocate result */
@@ -70,15 +72,19 @@ SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
     /* set names */
     setAttrib(sOutput, R_NamesSymbol, sOutputNames = allocVector(STRSXP, ncol));
 
-    /* set automatic row names */
-    PROTECT(tmp = allocVector(INTSXP, 2));
-    INTEGER(tmp)[0] = NA_INTEGER;
-    INTEGER(tmp)[1] = -nrow;
-    setAttrib(sOutput, R_RowNamesSymbol, tmp);
-    UNPROTECT(1);
+    if (nrow > INT_MAX)
+	Rf_warning("R currently doesn't support large data frames, but we have %lu rows, returning a named list instead", nrow);
+    else {
+	/* set automatic row names */
+	PROTECT(tmp = allocVector(INTSXP, 2));
+	INTEGER(tmp)[0] = NA_INTEGER;
+	INTEGER(tmp)[1] = -nrow;
+	setAttrib(sOutput, R_RowNamesSymbol, tmp);
+	UNPROTECT(1);
 
-    /* set class */
-    classgets(sOutput, mkString("data.frame"));
+	/* set class */
+	classgets(sOutput, mkString("data.frame"));
+    }
 
     /* Create SEXP for each element of the output */
     j = 0;
@@ -121,7 +127,7 @@ SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
 
     /* Cycle through the rows and extract the data */
     for (k = 0; k < nrow; k++) {
-      const char *l, *le;
+      const char *l = 0, *le;
       if (TYPEOF(s) == RAWSXP) {
           l = sraw;
           le = memchr(l, '\n', send - l);
