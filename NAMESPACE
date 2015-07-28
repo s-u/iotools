@@ -40,8 +40,7 @@ export(write.csv.raw)
 export(write.table.raw)
 
 importFrom(methods, as)
-importFrom(parallel, mcparallel, mccollect)
-importFrom("utils", "type.convert")
+importFrom(utils, type.convert)
 
 S3method(as.output, data.frame)
 S3method(as.output, default)
