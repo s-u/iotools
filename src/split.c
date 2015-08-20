@@ -70,6 +70,7 @@ SEXP mat_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
     if (TYPEOF(s) == RAWSXP) {
       c = sraw;
       le = memchr(sraw, '\n', send - sraw);
+      if (le == NULL) le = send;
       if (TYPEOF(sWhat) == STRSXP && quoteLen) {
         ncol = 0;
         while(1)
