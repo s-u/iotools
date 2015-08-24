@@ -3,6 +3,7 @@
 #include <Rdefines.h>
 #include <string.h>
 #include <stdlib.h>
+#include <R_ext/Connections.h>
 
 #define FL_RESILIENT 1 /* do not fail, proceed even if the input has more columns */
 
@@ -13,10 +14,15 @@ typedef struct dybuf_info {
     unsigned long pos, size;
     char *data;
     SEXP tail;
+    Rconnection con;
 } dybuf_info_t;
 
+extern Rconnection getConnection(int n);
+
+#define DEFAULT_CONN_BUFFER_SIZE 8388608 /* 8Mb */
+
 /* NOTE: retuns a *protected* object */
-SEXP dybuf_alloc(unsigned long size) {
+SEXP dybuf_alloc(unsigned long size, SEXP sConn) {
     SEXP s = PROTECT(allocVector(VECSXP, 2));
     SEXP r = SET_VECTOR_ELT(s, 0, list1(allocVector(RAWSXP, size)));
     dybuf_info_t *d = (dybuf_info_t*) RAW(SET_VECTOR_ELT(s, 1, allocVector(RAWSXP, sizeof(dybuf_info_t))));
@@ -24,6 +30,7 @@ SEXP dybuf_alloc(unsigned long size) {
     d->size = size;
     d->tail = r;
     d->data = (char*) RAW(CAR(r));
+    d->con  = (sConn && inherits(sConn, "connection")) ? getConnection(asInteger(sConn)) : 0;
     return s;
 }
 
@@ -40,8 +47,25 @@ void dybuf_add(SEXP s, const char *data, unsigned long len) {
 	len -= n;
     }
     /* printf("[%lu/%lu] filled, need %lu more", d->pos, d->size, len); */
-    /* need more buffers */
-    {
+
+    /* if the output is connection-based, flush */
+    if (d->con) {
+	long wr;
+	/* FIXME: should we try partial sends as well ? */
+	if ((wr = R_WriteConnection(d->con, d->data, d->pos)) != d->pos)
+	    Rf_error("write failed, expected %lu, got %ld", d->pos, wr);
+	d->pos = 0;
+	/* if the extra content is substantially big, don't even
+	   bother storing it and send right away */
+	if (len > (d->size / 2)) {
+	    /* FIXME: (actually FIX R): WriteConnection should be using const void* */
+	    if ((wr = R_WriteConnection(d->con, (void*) data, len)) != len)
+		Rf_error("write failed, expected %lu, got %ld", len, wr);
+	} else { /* otherwise copy into the buffer */
+	    memcpy(d->data, data, len);
+	    d->pos = len;
+	}
+    } else { /* need more buffers */
 	SEXP nb;
 	while (len > d->size) d->size *= 2;
 	/* printf(", creating %lu more\n", d->size); */
@@ -67,6 +91,14 @@ SEXP dybuf_collect(SEXP s) {
     unsigned long total = 0;
     char *dst;
     SEXP head = VECTOR_ELT(s, 0), res;
+    if (d->con) {
+	long wr;
+	/* FIXME: should we try partial sends as well ? */
+	if ((wr = R_WriteConnection(d->con, d->data, d->pos)) != d->pos)
+	    Rf_error("write failed, expected %lu, got %ld", d->pos, wr);
+	d->pos = 0;
+	return R_NilValue;
+    }
     while (d->tail != head) {
 	total += LENGTH(CAR(head));
 	head = CDR(head);
@@ -176,7 +208,7 @@ static void store(SEXP buf, SEXP what, R_xlen_t i) {
 
 /* FIXME: all the code below breaks on 32-bit overflows - we need to re-write it
    both with long vector support and 64-bit accumulators */
-SEXP as_output_matrix(SEXP sMat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNsep, SEXP sRownamesFlag) {
+SEXP as_output_matrix(SEXP sMat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNsep, SEXP sRownamesFlag, SEXP sConn) {
     int nrow = asInteger(sNrow);
     int ncol = asInteger(sNcol);
     int rownamesFlag = asInteger(sRownamesFlag);
@@ -192,12 +224,13 @@ SEXP as_output_matrix(SEXP sMat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNsep, 
     SEXPTYPE what = TYPEOF(sMat);
     SEXP sRnames = Rf_getAttrib(sMat, R_DimNamesSymbol);
     sRnames = isNull(sRnames) ? 0 : VECTOR_ELT(sRnames,0);
+    int isConn = inherits(sConn, "connection");
 
     unsigned long row_len = ((unsigned long) guess_size(what)) * (unsigned long) ncol;
 
     if (rownamesFlag) row_len += 8;
 
-    SEXP buf = dybuf_alloc(row_len * nrow);
+    SEXP buf = dybuf_alloc(isConn ? DEFAULT_CONN_BUFFER_SIZE : (row_len * nrow), sConn);
     int i, j;
 
     for (i = 0; i < nrow; i++) {
@@ -220,7 +253,6 @@ SEXP as_output_matrix(SEXP sMat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNsep, 
 	dybuf_add1(buf, lend);
     }
 
-
     SEXP res = dybuf_collect(buf);
     UNPROTECT(1); /* buffer */
     return res;
@@ -235,7 +267,9 @@ static SEXP getAttrib0(SEXP vec, SEXP name) {
   return R_NilValue;
 }
 
-SEXP as_output_dataframe(SEXP sData, SEXP sWhat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNsep, SEXP sRownamesFlag) {
+
+/* FIXME: this needs to be converted to using dybuf */
+SEXP as_output_dataframe(SEXP sData, SEXP sWhat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNsep, SEXP sRownamesFlag, SEXP sConn) {
   int i, j;
   int nrow = asInteger(sNrow);
   int ncol = asInteger(sNcol);
@@ -250,6 +284,7 @@ SEXP as_output_dataframe(SEXP sData, SEXP sWhat, SEXP sNrow, SEXP sNcol, SEXP sS
   SEXP sRnames = getAttrib0(sData, R_RowNamesSymbol);
   int row_len = 0;
   int buf_len = 0;
+  int isConn = inherits(sConn, "connection");
   if (TYPEOF(sRnames) != STRSXP) sRnames = NULL;
 
   for (j = 0; j < ncol; j++) {
@@ -389,7 +424,7 @@ SEXP as_output_dataframe(SEXP sData, SEXP sWhat, SEXP sNrow, SEXP sNcol, SEXP sS
   return res;
 }
 
-SEXP as_output_vector(SEXP sVector, SEXP sNsep, SEXP sNamesFlag) {
+SEXP as_output_vector(SEXP sVector, SEXP sNsep, SEXP sNamesFlag, SEXP sConn) {
     R_xlen_t len = XLENGTH(sVector), i;
     int key_flag = asInteger(sNamesFlag);
     if (TYPEOF(sNsep) != STRSXP || LENGTH(sNsep) != 1)
@@ -398,12 +433,13 @@ SEXP as_output_vector(SEXP sVector, SEXP sNsep, SEXP sNamesFlag) {
     char lend = '\n';
     SEXPTYPE what = TYPEOF(sVector);
     SEXP sRnames = Rf_getAttrib(sVector, R_NamesSymbol);
+    int isConn = inherits(sConn, "connection");
     if (isNull(sRnames)) sRnames = 0;
 
     unsigned long row_len = ((unsigned long) guess_size(what));
     if (key_flag) row_len += 8;
 
-    SEXP buf = dybuf_alloc(row_len);
+    SEXP buf = dybuf_alloc(isConn ? DEFAULT_CONN_BUFFER_SIZE : row_len, sConn);
 
     for (i = 0; i < len; i++) {
 	if (key_flag) {
