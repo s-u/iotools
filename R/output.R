@@ -17,13 +17,7 @@ as.output.data.frame <- function(x, sep = "|", nsep="\t", keys, con=NULL, ...) {
   if (ncol(x) == 1L)
     return(as.output.default(x[,1], nsep=nsep, keys=keys, con=con, ...))
 
-  colClasses = sapply(x, class)
-  known <- colClasses %in% c("logical", "integer", "numeric", "complex", "character", "raw")
-  for (j in (1:ncol(x))[!known])
-    x[,j] = as.character(x[,j])
-  colClasses[!known] = "character"
-  what = sapply(colClasses, do.call, list(0))
-  .Call(as_output_dataframe, x, what, nrow(x), ncol(x), as.character(sep),
+  .Call(as_output_dataframe, x, nrow(x), ncol(x), as.character(sep),
         as.character(nsep), keys, con)
 }
 

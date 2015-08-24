@@ -269,159 +269,69 @@ static SEXP getAttrib0(SEXP vec, SEXP name) {
 
 
 /* FIXME: this needs to be converted to using dybuf */
-SEXP as_output_dataframe(SEXP sData, SEXP sWhat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNsep, SEXP sRownamesFlag, SEXP sConn) {
-  int i, j;
-  int nrow = asInteger(sNrow);
-  int ncol = asInteger(sNcol);
-  int rownamesFlag = asInteger(sRownamesFlag);
-  if (TYPEOF(sSep) != STRSXP || LENGTH(sSep) != 1)
-    Rf_error("sep must be a single string");
-  if (TYPEOF(sNsep) != STRSXP || LENGTH(sNsep) != 1)
-    Rf_error("nsep must be a single string");
-  char sep = CHAR(STRING_ELT(sSep, 0))[0];
-  char nsep = CHAR(STRING_ELT(sNsep, 0))[0];
-  char lend = '\n';
-  SEXP sRnames = getAttrib0(sData, R_RowNamesSymbol);
-  int row_len = 0;
-  int buf_len = 0;
-  int isConn = inherits(sConn, "connection");
-  if (TYPEOF(sRnames) != STRSXP) sRnames = NULL;
-
-  for (j = 0; j < ncol; j++) {
-    switch (TYPEOF(VECTOR_ELT(sWhat,j))) {
-      case LGLSXP:
-        row_len += 2;
-        break;
-
-      case INTSXP:
-        row_len += 11;
-        break;
-
-      case REALSXP:
-        row_len += 23;
-        break;
-
-      case CPLXSXP:
-        row_len += 48;
-        break;
-
-      case STRSXP:
-        row_len += 1;
-        break;
-
-      case RAWSXP:
-        row_len += 3;
-        break;
-
-      default:
-        Rf_error("Unsupported input to what.");
-        break;
-    }
-  }
-
-  if (rownamesFlag == 1) row_len++;
-  buf_len = row_len*nrow+1;
-
-  char * buf = (char *) malloc(buf_len);
-  int buf_pos = 0;
-  int ssize = 0;
-
-  for (i=0; i < nrow; i++)
-  {
-    if (rownamesFlag) {
-      if (sRnames) {
-	ssize = LENGTH(STRING_ELT(sRnames, i));
-	if (ssize + buf_pos + row_len > buf_len) {
-	  buf_len = 2*buf_len + ssize + row_len;
-	  char * tmp = realloc(buf, buf_len);
-	  if (tmp != NULL) {
-	    buf = tmp;
-	  } else {
-	    free(buf);
-	    Rf_error("out of memory");
-	  }
-	}
-	memcpy(buf + buf_pos, CHAR(STRING_ELT(sRnames, i)), ssize);
-	buf_pos += ssize;
-      } else {
-	/* FIXME: use sprintf("%d", i) for automatic row names? */
-      }
-      buf[buf_pos] = nsep;
-      buf_pos++;
-    }
+SEXP as_output_dataframe(SEXP sWhat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNsep, SEXP sRownamesFlag, SEXP sConn) {
+    int i, j;
+    int nrow = asInteger(sNrow);
+    int ncol = asInteger(sNcol);
+    int rownamesFlag = asInteger(sRownamesFlag);
+    if (TYPEOF(sSep) != STRSXP || LENGTH(sSep) != 1)
+	Rf_error("sep must be a single string");
+    if (TYPEOF(sNsep) != STRSXP || LENGTH(sNsep) != 1)
+	Rf_error("nsep must be a single string");
+    char sep = CHAR(STRING_ELT(sSep, 0))[0];
+    char nsep = CHAR(STRING_ELT(sNsep, 0))[0];
+    char lend = '\n';
+    SEXP sRnames = getAttrib0(sWhat, R_RowNamesSymbol);
+    int row_len = 0;
+    int isConn = inherits(sConn, "connection"), mod = 0;
+    if (TYPEOF(sRnames) != STRSXP) sRnames = NULL;
 
     for (j = 0; j < ncol; j++) {
-      switch (TYPEOF(VECTOR_ELT(sWhat,j))) {
-        case LGLSXP:
-          if (INTEGER(VECTOR_ELT(sData,j))[i] == NA_INTEGER)
-          {
-            buf_pos += snprintf(buf + buf_pos, 2, "%c%c", 'N', 'A');
-          } else if (INTEGER(VECTOR_ELT(sData,j))[i] == 0) {
-            buf_pos += snprintf(buf + buf_pos, 2, "%c", 'F');
-          } else {
-            buf_pos += snprintf(buf + buf_pos, 2, "%c", 'T');
-          }
-          break;
-
-        case INTSXP:
-          if (INTEGER(VECTOR_ELT(sData,j))[i] == NA_INTEGER)
-          {
-            buf_pos += snprintf(buf + buf_pos, 3, "%c%c", 'N', 'A');
-          } else {
-            buf_pos += snprintf(buf + buf_pos, 11, "%d", INTEGER(VECTOR_ELT(sData,j))[i]);
-          }
-          break;
-
-        case REALSXP:
-          if (ISNA(REAL(VECTOR_ELT(sData,j))[i]))
-          {
-            buf_pos += snprintf(buf + buf_pos, 3, "%c%c", 'N', 'A');
-          } else {
-            buf_pos += snprintf(buf + buf_pos, 23, "%.15g", REAL(VECTOR_ELT(sData,j))[i]);
-          }
-          break;
-
-        case CPLXSXP:
-          if (ISNA(COMPLEX(VECTOR_ELT(sData,j))[i].r))
-          {
-            buf_pos += snprintf(buf + buf_pos, 3, "%c%c", 'N', 'A');
-          } else {
-            buf_pos += snprintf(buf + buf_pos, 48, "%.15g+%.15gi",
-                                  COMPLEX(VECTOR_ELT(sData,j))[i].r,
-                                  COMPLEX(VECTOR_ELT(sData,j))[i].i);
-          }
-          break;
-
-        case STRSXP:
-          ssize = LENGTH(STRING_ELT(VECTOR_ELT(sData,j), i));
-          if (ssize + buf_pos + row_len > buf_len) {
-            buf_len = 2*buf_len + ssize + row_len;
-            char * tmp = realloc(buf, buf_len);
-            if (tmp != NULL) {
-              buf = tmp;
-            } else {
-	      free(buf);
-	      Rf_error("out of memory");
+	/* we have to call as.character() for objects with a class
+	   since they may require a different representation */
+	if (getAttrib(VECTOR_ELT(sWhat, j), R_ClassSymbol) != R_NilValue) {
+	    /* did we create a modified copy yet? If not, do so */
+	    if (!mod) {
+		/* shallow copy - we use it only internally so should be ok */
+		SEXP sData = allocVector(VECSXP, XLENGTH(sWhat));
+		memcpy(&(VECTOR_ELT(sData, 0)), &(VECTOR_ELT(sWhat, 0)),
+		       sizeof(SEXP) * XLENGTH(sWhat));
+		sWhat = sData;
+		mod = 1;
 	    }
-          }
-          memcpy(buf + buf_pos, CHAR(STRING_ELT(VECTOR_ELT(sData,j), i)), ssize);
-          buf_pos += ssize;
-          break;
-
-        case RAWSXP:
-          buf_pos += snprintf(buf + buf_pos, 3, "%2.2x", RAW(VECTOR_ELT(sData,j))[i]);
-          break;
-      }
-      buf[buf_pos] = (rownamesFlag == 2 && j == 0) ? nsep : sep;
-      buf_pos++;
+	    SEXP asc = PROTECT(lang2(Rf_install("as.character"), VECTOR_ELT(sWhat, j)));
+	    SET_VECTOR_ELT(sWhat, j, eval(asc, R_GlobalEnv));
+	    UNPROTECT(1);
+	}
+	row_len += guess_size(TYPEOF(VECTOR_ELT(sWhat, j)));
     }
-    buf[buf_pos-1] = lend;
-  }
 
-  SEXP res = allocVector(RAWSXP, buf_pos);
-  memcpy(RAW(res), buf, buf_pos);
-  free(buf);
-  return res;
+    if (rownamesFlag == 1) row_len++;
+
+    SEXP buf = dybuf_alloc(isConn ? DEFAULT_CONN_BUFFER_SIZE : (row_len * nrow), sConn);
+
+    for (i = 0; i < nrow; i++) {
+	if (rownamesFlag) {
+	    if (sRnames) {
+		const char *c = CHAR(STRING_ELT(sRnames, i));
+		dybuf_add(buf, c, strlen(c));
+	    } else {
+		/* FIXME: use sprintf("%d", i) for automatic row names? */
+	    }
+	    dybuf_add1(buf, nsep);
+	}
+
+	for (j = 0; j < ncol; j++) {
+	    store(buf, VECTOR_ELT(sWhat, j), i);
+	    if (j < ncol - 1)
+		dybuf_add1(buf, (rownamesFlag == 2 && j == 0) ? nsep : sep);
+	}
+	dybuf_add1(buf, lend);
+    }
+
+    SEXP res = dybuf_collect(buf);
+    UNPROTECT(1); /* buffer */
+    return res;
 }
 
 SEXP as_output_vector(SEXP sVector, SEXP sNsep, SEXP sNamesFlag, SEXP sConn) {
