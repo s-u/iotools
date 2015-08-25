@@ -284,6 +284,7 @@ SEXP as_output_dataframe(SEXP sWhat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNs
     SEXP sRnames = getAttrib0(sWhat, R_RowNamesSymbol);
     int row_len = 0;
     int isConn = inherits(sConn, "connection"), mod = 0;
+    SEXP as_character = R_NilValue;
     if (TYPEOF(sRnames) != STRSXP) sRnames = NULL;
 
     for (j = 0; j < ncol; j++) {
@@ -293,13 +294,14 @@ SEXP as_output_dataframe(SEXP sWhat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNs
 	    /* did we create a modified copy yet? If not, do so */
 	    if (!mod) {
 		/* shallow copy - we use it only internally so should be ok */
-		SEXP sData = allocVector(VECSXP, XLENGTH(sWhat));
+		SEXP sData = PROTECT(allocVector(VECSXP, XLENGTH(sWhat)));
 		memcpy(&(VECTOR_ELT(sData, 0)), &(VECTOR_ELT(sWhat, 0)),
 		       sizeof(SEXP) * XLENGTH(sWhat));
 		sWhat = sData;
 		mod = 1;
+		as_character = Rf_install("as.character");
 	    }
-	    SEXP asc = PROTECT(lang2(Rf_install("as.character"), VECTOR_ELT(sWhat, j)));
+	    SEXP asc = PROTECT(lang2(as_character, VECTOR_ELT(sWhat, j)));
 	    SET_VECTOR_ELT(sWhat, j, eval(asc, R_GlobalEnv));
 	    UNPROTECT(1);
 	}
@@ -329,6 +331,7 @@ SEXP as_output_dataframe(SEXP sWhat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNs
 	dybuf_add1(buf, lend);
     }
 
+    if (mod) UNPROTECT(1); /* sData */
     SEXP res = dybuf_collect(buf);
     UNPROTECT(1); /* buffer */
     return res;
