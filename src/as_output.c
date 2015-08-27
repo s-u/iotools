@@ -206,6 +206,30 @@ static void store(SEXP buf, SEXP what, R_xlen_t i) {
     }
 }
 
+/* when should we use as.character()? We are careful and convert anything that
+   has an explicit class - except for AsIs */
+static int requires_as_character(SEXP sWhat) {
+    /* first, everything that is not a native scalar vector has to be converted */
+    switch (TYPEOF(sWhat)) {
+    case LGLSXP:
+    case INTSXP:
+    case REALSXP:
+    case CPLXSXP:
+    case STRSXP:
+    case RAWSXP:
+	break;
+    default:
+	/* anything NOT listed above is not a native vector, so it
+	   has to be converted in all cases */
+	return 1;
+    }
+
+    /* then we still have to check for class -- famous examples that illustrate
+       why we need this are factor and POSIXct */
+    SEXP sClass = getAttrib(sWhat, R_ClassSymbol);
+    return (sClass != R_NilValue && !inherits(sWhat, "AsIs"));
+}
+
 /* FIXME: all the code below breaks on 32-bit overflows - we need to re-write it
    both with long vector support and 64-bit accumulators */
 SEXP as_output_matrix(SEXP sMat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNsep, SEXP sRownamesFlag, SEXP sConn) {
@@ -268,11 +292,15 @@ static SEXP getAttrib0(SEXP vec, SEXP name) {
 }
 
 
-/* FIXME: this needs to be converted to using dybuf */
-SEXP as_output_dataframe(SEXP sWhat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNsep, SEXP sRownamesFlag, SEXP sConn) {
-    int i, j;
-    int nrow = asInteger(sNrow);
-    int ncol = asInteger(sNcol);
+SEXP as_output_dataframe(SEXP sWhat, SEXP sSep, SEXP sNsep, SEXP sRownamesFlag, SEXP sConn, SEXP sRecycle) {
+    unsigned long i, j;
+    if (TYPEOF(sWhat) != VECSXP)
+	Rf_error("object must be a data.frame");
+    unsigned long ncol = XLENGTH(sWhat);
+    unsigned long nrow = 0;
+    unsigned long row_len = 0;
+    if (ncol)
+	nrow = XLENGTH(VECTOR_ELT(sWhat, 0));
     int rownamesFlag = asInteger(sRownamesFlag);
     if (TYPEOF(sSep) != STRSXP || LENGTH(sSep) != 1)
 	Rf_error("sep must be a single string");
@@ -282,15 +310,15 @@ SEXP as_output_dataframe(SEXP sWhat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNs
     char nsep = CHAR(STRING_ELT(sNsep, 0))[0];
     char lend = '\n';
     SEXP sRnames = getAttrib0(sWhat, R_RowNamesSymbol);
-    int row_len = 0;
     int isConn = inherits(sConn, "connection"), mod = 0;
+    int recycle = (asInteger(sRecycle) > 0) ? 1 : 0;
     SEXP as_character = R_NilValue;
+    unsigned long *sizes = 0;
     if (TYPEOF(sRnames) != STRSXP) sRnames = NULL;
-
     for (j = 0; j < ncol; j++) {
 	/* we have to call as.character() for objects with a class
 	   since they may require a different representation */
-	if (getAttrib(VECTOR_ELT(sWhat, j), R_ClassSymbol) != R_NilValue) {
+	if (requires_as_character(VECTOR_ELT(sWhat, j))) {
 	    /* did we create a modified copy yet? If not, do so */
 	    if (!mod) {
 		/* shallow copy - we use it only internally so should be ok */
@@ -308,6 +336,31 @@ SEXP as_output_dataframe(SEXP sWhat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNs
 	row_len += guess_size(TYPEOF(VECTOR_ELT(sWhat, j)));
     }
 
+    if (ncol && recycle) { /* this allows us to support lists directly without requiring for
+			      them to be a data frames - in those cases we have to check the length
+			      of the columns to determine the longest */
+	unsigned long min_len = (unsigned long) XLENGTH(VECTOR_ELT(sWhat, 0));
+	for (j = 0; j < ncol; j++) {
+	    unsigned long l = 0;
+	    SEXP el = VECTOR_ELT(sWhat, j);
+	    /* NOTE: we can assume that el must be a scalar vector since anything that isn't
+	       will be passed through as.character() */
+	    l = (unsigned long) XLENGTH(el);
+	    if (l < min_len) min_len = l;
+	    if (l > nrow) nrow = l;
+	}
+	/* if all elements have the smae tlength then we don't need to re-cycle, so treat
+	   the list exactly like a data frame */
+	if (nrow == min_len)
+	    recycle = 0;
+	else { /* cache lengths since XLENGTH is actually not a cheap operation */
+	    SEXP foo = PROTECT(allocVector(RAWSXP, sizeof(long) * ncol));
+	    sizes = (unsigned long*) RAW(foo);
+	    for (j = 0; j < ncol; j++)
+		sizes[j] = (unsigned long) XLENGTH(VECTOR_ELT(sWhat, j));
+	}
+    }
+
     if (rownamesFlag == 1) row_len++;
 
     SEXP buf = dybuf_alloc(isConn ? DEFAULT_CONN_BUFFER_SIZE : (row_len * nrow), sConn);
@@ -323,14 +376,27 @@ SEXP as_output_dataframe(SEXP sWhat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNs
 	    dybuf_add1(buf, nsep);
 	}
 
-	for (j = 0; j < ncol; j++) {
-	    store(buf, VECTOR_ELT(sWhat, j), i);
-	    if (j < ncol - 1)
-		dybuf_add1(buf, (rownamesFlag == 2 && j == 0) ? nsep : sep);
-	}
+	if (recycle) /* slower - we need to use modulo to recycle */
+	    /* FIXME: modulo is slow for large vectors, should we just keep
+	       separate index for every column? It may be worth measuring
+	       the impact ... We are already trying to be smart by avoiding modulo
+	       for the two most common cases: full-length vectors and vectors of length 1
+	       so this will only impact non-trivial recycling */
+	    for (j = 0; j < ncol; j++) {
+		store(buf, VECTOR_ELT(sWhat, j), (i < sizes[j]) ? i : ((sizes[j] == 1) ? 0 : (i % sizes[j])));
+		if (j < ncol - 1)
+		    dybuf_add1(buf, (rownamesFlag == 2 && j == 0) ? nsep : sep);
+	    }
+	else
+	    for (j = 0; j < ncol; j++) {
+		store(buf, VECTOR_ELT(sWhat, j), i);
+		if (j < ncol - 1)
+		    dybuf_add1(buf, (rownamesFlag == 2 && j == 0) ? nsep : sep);
+	    }
 	dybuf_add1(buf, lend);
     }
 
+    if (recycle) UNPROTECT(1); /* sizes cache */
     if (mod) UNPROTECT(1); /* sData */
     SEXP res = dybuf_collect(buf);
     UNPROTECT(1); /* buffer */
@@ -339,13 +405,30 @@ SEXP as_output_dataframe(SEXP sWhat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNs
 
 SEXP as_output_vector(SEXP sVector, SEXP sNsep, SEXP sNamesFlag, SEXP sConn) {
     R_xlen_t len = XLENGTH(sVector), i;
-    int key_flag = asInteger(sNamesFlag);
+    int key_flag = asInteger(sNamesFlag), mod = 0;
     if (TYPEOF(sNsep) != STRSXP || LENGTH(sNsep) != 1)
 	Rf_error("nsep must be a single string");
     char nsep = CHAR(STRING_ELT(sNsep, 0))[0];
     char lend = '\n';
-    SEXPTYPE what = TYPEOF(sVector);
     SEXP sRnames = Rf_getAttrib(sVector, R_NamesSymbol);
+    if (requires_as_character(sVector)) {
+	SEXP as_character = Rf_install("as.character");
+	SEXP asc = PROTECT(lang2(as_character, sVector));
+	sVector = eval(asc, R_GlobalEnv);
+	UNPROTECT(1);
+	PROTECT(sVector);
+	mod = 1;
+	/* since as.character() drops names, we want re-use original names, but that
+	   means we have to check if it is actually meaningful. We do NOT perform
+	   re-cycling since mismatches are unlikely intentional. */
+	if (key_flag && TYPEOF(sRnames) == STRSXP &&
+	    (TYPEOF(sVector) != STRSXP || XLENGTH(sVector) != XLENGTH(sRnames))) {
+	    Rf_warning("coersion of named object using as.character() yields different length (%ld) than original names (%ld), dropping names", (long) XLENGTH(sVector), (long) XLENGTH(sRnames));
+	    sRnames = R_NilValue;
+	}
+    }
+    
+    SEXPTYPE what = TYPEOF(sVector);
     int isConn = inherits(sConn, "connection");
     if (isNull(sRnames)) sRnames = 0;
 
@@ -365,8 +448,7 @@ SEXP as_output_vector(SEXP sVector, SEXP sNsep, SEXP sNamesFlag, SEXP sConn) {
 	store(buf, sVector, i);
 	dybuf_add1(buf, lend);
     }
-
     SEXP res = dybuf_collect(buf);
-    UNPROTECT(1);
+    UNPROTECT(1 + mod);
     return res;
 }
