@@ -9,6 +9,10 @@
 
 #include "utils.h"
 
+/* FIXME: use long to simplify dealing with 32-bit vs 64-bit indexing,
+   but that doesn't work on Windows where MS has brain-deadly defined
+   long to be 32-bit even on 64-bit Windows. */
+
 /* we keep all our cached info in a raw vector with this layout */
 typedef struct dybuf_info {
     unsigned long pos, size;
@@ -230,11 +234,12 @@ static int requires_as_character(SEXP sWhat) {
     return (sClass != R_NilValue && !inherits(sWhat, "AsIs"));
 }
 
-/* FIXME: all the code below breaks on 32-bit overflows - we need to re-write it
-   both with long vector support and 64-bit accumulators */
 SEXP as_output_matrix(SEXP sMat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNsep, SEXP sRownamesFlag, SEXP sConn) {
-    int nrow = asInteger(sNrow);
-    int ncol = asInteger(sNcol);
+    R_xlen_t nrow = asLong(sNrow, -1);
+    R_xlen_t ncol = asLong(sNcol, -1);
+    if (nrow < 0 || ncol < 0)
+	Rf_error("invalid/missing matrix dimensions");
+
     int rownamesFlag = asInteger(sRownamesFlag);
 
     if (TYPEOF(sSep) != STRSXP || LENGTH(sSep) != 1)
@@ -250,12 +255,12 @@ SEXP as_output_matrix(SEXP sMat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNsep, 
     sRnames = isNull(sRnames) ? 0 : VECTOR_ELT(sRnames,0);
     int isConn = inherits(sConn, "connection");
 
-    unsigned long row_len = ((unsigned long) guess_size(what)) * (unsigned long) ncol;
+    R_xlen_t row_len = ((R_xlen_t) guess_size(what)) * (R_xlen_t) ncol;
 
     if (rownamesFlag) row_len += 8;
 
     SEXP buf = dybuf_alloc(isConn ? DEFAULT_CONN_BUFFER_SIZE : (row_len * nrow), sConn);
-    int i, j;
+    R_xlen_t i, j;
 
     for (i = 0; i < nrow; i++) {
 	if (rownamesFlag) {
@@ -263,9 +268,8 @@ SEXP as_output_matrix(SEXP sMat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNsep, 
 		const char *c = CHAR(STRING_ELT(sRnames, i));
 		dybuf_add(buf, c, strlen(c));
 	    }
-      dybuf_add1(buf, nsep);
+	    dybuf_add1(buf, nsep);
 	}
-
 
 	for (j = 0; j < ncol; j++) {
 	    R_xlen_t pos = j;
