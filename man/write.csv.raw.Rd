@@ -10,7 +10,7 @@
 }
 \usage{
 write.csv.raw(x, file = "", append = FALSE, sep = ",", nsep="\t",
-              col.names = TRUE, fileEncoding = "")
+              col.names = !is.null(colnames(x)), fileEncoding = "")
 
 write.table.raw(x, file = "", sep = " ", ...)
 }

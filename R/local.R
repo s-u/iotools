@@ -120,7 +120,7 @@ read.delim.raw = function(file, header=TRUE, sep="\t", ...) {
 }
 
 write.csv.raw = function(x, file = "", append = FALSE, sep = ",", nsep="\t",
-                          col.names = TRUE, fileEncoding = "") {
+                          col.names = !is.null(colnames(x)), fileEncoding = "") {
   if (is.character(file)) {
     file <- if (nzchar(fileEncoding))
             file(file, ifelse(append, "ab", "wb"), encoding = fileEncoding)
@@ -129,6 +129,11 @@ write.csv.raw = function(x, file = "", append = FALSE, sep = ",", nsep="\t",
   } else if (!isOpen(file, "w")) {
     open(file, "wb")
     on.exit(close(file))
+  }
+
+  if (col.names) {
+    cr = rawToChar(as.output(matrix(colnames(x),nrow=1),sep = sep))
+    writeBin(cr, con=file)
   }
 
   r = as.output(x, sep = sep, nsep=nsep)
