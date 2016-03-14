@@ -144,3 +144,40 @@ write.table.raw = function(x, file = "", sep = " ", ...) {
   write.csv.raw(x, file=file, sep=sep, ...)
 }
 
+chunk.map = function(input, output = NULL, formatter = .default.formatter,
+                      FUN, key.sep = NULL, max.line = 65536L,
+                      max.size = 33554432L, output.sep = ",", output.nsep = "\t",
+                      output.keys = FALSE, skip = 0L, ...) {
+
+  if (is.character(input)) {
+    input = file(input, "rb")
+    on.exit(close(input))
+  }
+  if (is.character(output)) {
+    output = file(output, "wb")
+    on.exit(close(output))
+  }
+
+  res <- list()
+  if (skip > 0L) readLines(input, n=skip)
+  cr = chunk.reader(input, max.line = max.line, sep = key.sep)
+
+  while ( length(r <- read.chunk(cr)) ) {
+    val = FUN(formatter(r), ...)
+
+    if (!is.null(output)) {
+      rout = as.output(val, sep = output.sep, nsep = output.nsep, keys = output.keys)
+      writeBin(rout, output)
+    } else {
+      res <- append(res, list(val))
+    }
+  }
+
+  if (is.null(output)) return(res)
+}
+
+
+
+
+
+
