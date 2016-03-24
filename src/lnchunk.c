@@ -2,14 +2,18 @@
 #include <string.h>
 
 #include <Rinternals.h>
+#include <Rversion.h>
 #include <R_ext/Connections.h>
 
 #if R_CONNECTIONS_VERSION != 1
 #error "Missing or unsupported connection API in R"
 #endif
 
-/* this should really be in R_ext/Connections.h */
+#if R_VERSION < R_Version(3,3,0)
+/* R before 3.3.0 didn't have R_GetConnection() */
 extern Rconnection getConnection(int n);
+static Rconnection R_GetConnection(SEXP sConn) { return getConnection(asInteger(sConn)); }
+#endif
 
 typedef struct chunk_read {
     int len, alloc;
@@ -44,7 +48,7 @@ SEXP create_chunk_reader(SEXP sConn, SEXP sMaxLine, SEXP sKeySep) {
 	Rf_error("invalid connection");
     if (max_line < 64) Rf_error("invalid max.line (must be at least 64)");
 
-    con = getConnection(asInteger(sConn));
+    con = R_GetConnection(sConn);
     r = (chunk_read_t*) malloc(sizeof(chunk_read_t) + max_line);
     if (!r) Rf_error("Unable to allocate %.3fMb for line buffer", ((double) max_line) / (1024.0*1024.0));
     r->len   = 0;

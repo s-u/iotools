@@ -3,6 +3,7 @@
 #include <Rdefines.h>
 #include <string.h>
 #include <stdlib.h>
+#include <Rversion.h>
 #include <R_ext/Connections.h>
 
 #define FL_RESILIENT 1 /* do not fail, proceed even if the input has more columns */
@@ -21,7 +22,11 @@ typedef struct dybuf_info {
     Rconnection con;
 } dybuf_info_t;
 
+#if R_VERSION < R_Version(3,3,0)
+/* R before 3.3.0 didn't have R_GetConnection() */
 extern Rconnection getConnection(int n);
+static Rconnection R_GetConnection(SEXP sConn) { return getConnection(asInteger(sConn)); }
+#endif
 
 #define DEFAULT_CONN_BUFFER_SIZE 8388608 /* 8Mb */
 
@@ -34,7 +39,7 @@ SEXP dybuf_alloc(unsigned long size, SEXP sConn) {
     d->size = size;
     d->tail = r;
     d->data = (char*) RAW(CAR(r));
-    d->con  = (sConn && inherits(sConn, "connection")) ? getConnection(asInteger(sConn)) : 0;
+    d->con  = (sConn && inherits(sConn, "connection")) ? R_GetConnection(sConn) : 0;
     return s;
 }
 
