@@ -1,6 +1,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <stdio.h>
+#include <errno.h>
+#include <time.h>
+#include <unistd.h>
+#include <sys/select.h>
+
 #include <Rinternals.h>
 #include <Rversion.h>
 #include <R_ext/Connections.h>
@@ -21,6 +27,7 @@ typedef struct chunk_read {
     char keySep;
     long in_cache;
     Rconnection con;
+    int  fd;
     char buf[1];
 } chunk_read_t;
 
@@ -39,21 +46,26 @@ static const char *reader_class = "ChunkReader";
 static long last_key_back_(const char *buf, int len, char sep);
 
 SEXP create_chunk_reader(SEXP sConn, SEXP sMaxLine, SEXP sKeySep) {
-    int max_line = asInteger(sMaxLine);
+    int max_line = asInteger(sMaxLine), fd;
     Rconnection con;
     chunk_read_t *r;
     SEXP res;
 
-    if (!inherits(sConn, "connection"))
-	Rf_error("invalid connection");
     if (max_line < 64) Rf_error("invalid max.line (must be at least 64)");
+    if (inherits(sConn, "fileDescriptor")) {
+	con = 0;
+	fd = asInteger(sConn);
+    } else if (inherits(sConn, "connection")) {
+	con = R_GetConnection(sConn);
+	fd = -1;
+    } else Rf_error("invalid connection");
 
-    con = R_GetConnection(sConn);
     r = (chunk_read_t*) malloc(sizeof(chunk_read_t) + max_line);
     if (!r) Rf_error("Unable to allocate %.3fMb for line buffer", ((double) max_line) / (1024.0*1024.0));
     r->len   = 0;
     r->sConn = sConn;
     r->con   = con;
+    r->fd    = fd;
     r->alloc = max_line;
     r->keySep = (TYPEOF(sKeySep) == STRSXP && LENGTH(sKeySep) > 0) ? CHAR(STRING_ELT(sKeySep, 0))[0] : 0;
     r->tail = r->cache = R_NilValue;
@@ -140,9 +152,10 @@ static SEXP key_process(chunk_read_t *r, SEXP val) {
     return R_NilValue; /* special case - this is not an empty vector but rather saying that we need to read again */
 }
 
-SEXP chunk_read(SEXP sReader, SEXP sMaxSize) {
+SEXP chunk_read(SEXP sReader, SEXP sMaxSize, SEXP sTimeout) {
     SEXP res;
     int max_size = asInteger(sMaxSize), i, n;
+    double tout = (sTimeout == R_NilValue) ? R_PosInf : asReal(sTimeout);
     chunk_read_t *r;
     char *c;
 
@@ -160,7 +173,26 @@ SEXP chunk_read(SEXP sReader, SEXP sMaxSize) {
 	r->len = 0;
     }
     while (i < max_size) {
-	n = R_ReadConnection(r->con, c + i, max_size - i);
+	if (r->con)
+	    n = R_ReadConnection(r->con, c + i, max_size - i);
+	else { /* direct read using select */
+	    if (R_finite(tout) && tout >= 0.0) { /* read with timeout */
+		fd_set fds;
+		struct timeval tv = { (int) tout, ((int) (tout * 1000.0)) % 1000 };
+		FD_ZERO(&fds);
+		FD_SET(r->fd, &fds);
+		n = select(r->fd + 1, &fds, 0, 0, &tv);
+		if (!n) {
+		    UNPROTECT(1);
+		    return R_NilValue;
+		}
+		if (n < 0)
+		    Rf_error("Read error during select (%d): %s", errno, strerror(errno));
+	    }
+	    n = read(r->fd, c + i, max_size - i);
+	    if (n < 0)
+		Rf_error("Read error (%d): %s",  errno, strerror(errno));
+	}
 	if (n < 1) { /* nothing to read, return all we got so far - this is EOF */
 	    SEXP tmp = res;
 	    if (r->keySep && r->in_cache) { /* combine the last chunk with the cache in one go */
@@ -213,7 +245,7 @@ SEXP chunk_read(SEXP sReader, SEXP sMaxSize) {
 SEXP chunk_apply(SEXP sReader, SEXP sMaxSize, SEXP sMerge, SEXP sFUN, SEXP rho, SEXP sDots) {
     SEXP head = R_NilValue, tail = R_NilValue, elt;
     int pc = 0;
-    while (LENGTH(elt = chunk_read(sReader, sMaxSize)) > 0) {
+    while (LENGTH(elt = chunk_read(sReader, sMaxSize, R_NilValue)) > 0) {
 	SEXP val = eval(LCONS(sFUN, CONS(elt, sDots)), rho);
 	if (head == R_NilValue) {
 	    tail = head = PROTECT(CONS(val, R_NilValue));
@@ -237,7 +269,7 @@ SEXP chunk_tapply(SEXP sReader, SEXP sMaxSize, SEXP sMerge, SEXP sSep, SEXP sFUN
     int pc = 1;
     c_tail = cache = PROTECT(CONS(R_NilValue, R_NilValue));
     while (1) {
-	PROTECT(elt = chunk_read(sReader, sMaxSize));
+	PROTECT(elt = chunk_read(sReader, sMaxSize, R_NilValue));
 	if (LENGTH(elt) == 0) { /* EOF */
 	    if (CAR(cache) == R_NilValue) { /* any cache left? */
 		UNPROTECT(1);
