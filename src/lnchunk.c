@@ -178,7 +178,7 @@ SEXP chunk_read(SEXP sReader, SEXP sMaxSize, SEXP sTimeout) {
 	else { /* direct read using select */
 	    if (R_finite(tout) && tout >= 0.0) { /* read with timeout */
 		fd_set fds;
-		struct timeval tv = { (int) tout, ((int) (tout * 1000.0)) % 1000 };
+		struct timeval tv = { (int) tout, 1000 * (((int) (tout * 1000.0)) % 1000) };
 		FD_ZERO(&fds);
 		FD_SET(r->fd, &fds);
 		n = select(r->fd + 1, &fds, 0, 0, &tv);
