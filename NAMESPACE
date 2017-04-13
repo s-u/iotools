@@ -11,6 +11,7 @@ useDynLib(iotools, which_min_key)
 useDynLib(iotools, as_output_dataframe)
 useDynLib(iotools, as_output_matrix)
 useDynLib(iotools, as_output_vector)
+useDynLib(iotools, stdout_writeBin)
 
 export(mstrsplit)
 export(dstrsplit)
