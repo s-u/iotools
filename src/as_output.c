@@ -144,7 +144,7 @@ static int guess_size(SEXPTYPE type) {
 }
 
 static void store(SEXP buf, SEXP what, R_xlen_t i) {
-    char stbuf[64];
+    char stbuf[128];
     switch (TYPEOF(what)) {
     case LGLSXP:
 	{
