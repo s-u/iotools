@@ -1,4 +1,5 @@
 
 FLAGS="PKG_CPPFLAGS=-DWINDOWS"
+PKG_LIBS="PKG_LIBS=-lws2_32"
 echo "${FLAGS}" > src/Makevars
-
+echo "${PKG_LIBS}" >> src/Makevars
