@@ -1,4 +1,4 @@
 
-FLAGS="-DWINDOWS ${FLAGS}"
+FLAGS="PKG_CPPFLAGS=-DWINDOWS"
 echo "${FLAGS}" > src/Makevars
 
