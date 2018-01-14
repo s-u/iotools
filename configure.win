@@ -1,3 +1,4 @@
+
 FLAGS="${FLAGS} -DWINDOWS"
 echo "${FLAGS}" > src/Makevars
 
