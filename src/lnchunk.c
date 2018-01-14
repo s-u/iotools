@@ -5,7 +5,12 @@
 #include <errno.h>
 #include <time.h>
 #include <unistd.h>
-#include <winsock2.h> //#include <sys/select.h>
+
+#ifdef WINDOWS
+  #include <winsock2.h> 
+#else
+  #include <sys/select.h>
+#endif
 
 #include <Rinternals.h>
 #include <Rversion.h>
