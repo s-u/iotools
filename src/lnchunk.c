@@ -5,7 +5,6 @@
 #include <errno.h>
 #include <time.h>
 #include <unistd.h>
-#include <sys/select.h>
 
 #include <Rinternals.h>
 #include <Rversion.h>
