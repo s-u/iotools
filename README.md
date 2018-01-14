@@ -1,4 +1,12 @@
-### High-performance I/O tools for R
+High-performance I/O tools for R
+===
+
+**Maintainer:** Simon Urbanek<br/>
+**Authors:** Simon Urbanek and Taylor Arnold<br/>
+**Contributors:** Michael Kane
+
+[![Build Status](https://travis-ci.org/kaneplusplus/iotools.svg?branch=master)](https://travis-ci.org/kaneplusplus/iotools)
+[![Build status](https://ci.appveyor.com/api/projects/status/308d0abnnn6u4c4b?svg=true)](https://ci.appveyor.com/project/kaneplusplus/iotools)
 
 Anyone dealing with large data knows that stock tools in R are bad at
 loading (non-binary) data to R. This package started as an attempt to
