@@ -7,6 +7,7 @@
 #include <unistd.h>
 
 #ifdef WINDOWS
+  #define INCL_WINSOCK_API_PROTOTYPES
   #include <winsock2.h> 
 #else
   #include <sys/select.h>
