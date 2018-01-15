@@ -6,7 +6,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#ifdef WINDOWS
+#ifdef WIN32
   #define INCL_WINSOCK_API_PROTOTYPES
   #include <winsock2.h> 
 #else
