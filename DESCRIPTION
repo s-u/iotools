@@ -1,11 +1,11 @@
 Package: iotools
-Version: 0.2-4
+Version: 0.2-5
 Title: I/O Tools for Streaming
 Author: Simon Urbanek <Simon.Urbanek@r-project.org>, Taylor Arnold <taylor.arnold@acm.org>
 Maintainer: Simon Urbanek <Simon.Urbanek@r-project.org>
 Depends: R (>= 2.9.0)
 Imports: methods, parallel, utils
 Suggests: testthat
-Description: Basic I/O tools for streaming.
+Description: Basic I/O tools for streaming and data parsing.
 License: GPL-2 | GPL-3
 URL: http://www.rforge.net/iotools
