@@ -5,7 +5,9 @@
 #include <errno.h>
 #include <time.h>
 #include <unistd.h>
+#ifndef WIN32
 #include <sys/select.h>
+#endif
 
 #include <Rinternals.h>
 #include <Rversion.h>
@@ -177,6 +179,9 @@ SEXP chunk_read(SEXP sReader, SEXP sMaxSize, SEXP sTimeout) {
 	    n = R_ReadConnection(r->con, c + i, max_size - i);
 	else { /* direct read using select */
 	    if (R_finite(tout) && tout >= 0.0) { /* read with timeout */
+#ifdef WIN32
+		Rf_error("Direct I/O using timeouts is not supported on Windows");
+#else
 		fd_set fds;
 		struct timeval tv = { (int) tout, 1000 * (((int) (tout * 1000.0)) % 1000) };
 		FD_ZERO(&fds);
@@ -188,6 +193,7 @@ SEXP chunk_read(SEXP sReader, SEXP sMaxSize, SEXP sTimeout) {
 		}
 		if (n < 0)
 		    Rf_error("Read error during select (%d): %s", errno, strerror(errno));
+#endif
 	    }
 	    n = read(r->fd, c + i, max_size - i);
 	    if (n < 0)

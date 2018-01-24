@@ -48,7 +48,7 @@ read.chunk(reader, max.size = 33554432L, timeout = Inf)
   descriptors (integers of the class \code{"fileDescriptor"}). In that
   case the reads are preformed directly by \code{chunk.reader} and
   \code{timeout} can be used to perform non-blocking or timed
-  reads. The \code{timeout} argument is ignored for connections.
+  reads (unix only, not supported on Windows).
 }
 \value{
   \code{chunk.reader} returns an object that can be used by
