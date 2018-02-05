@@ -51,6 +51,8 @@ SEXP C_rbind(SEXP sList) {
 		   require additional processing */
 		if (TYPEOF(dst) == REALSXP)
 		    memcpy(REAL(dst) + nrow, REAL(src), sizeof(double) * n);
+		else if (TYPEOF(dst) == LGLSXP)
+		    memcpy(LOGICAL(dst) + nrow, LOGICAL(src), sizeof(int) * n);
 		else if (TYPEOF(dst) == INTSXP)
 		    memcpy(INTEGER(dst) + nrow, INTEGER(src), sizeof(int) * n);
 		else if (TYPEOF(dst) == STRSXP) {
