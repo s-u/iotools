@@ -3,6 +3,7 @@
 #include <Rdefines.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <Rversion.h>
 #include <R_ext/Connections.h>
 
@@ -20,6 +21,7 @@ typedef struct dybuf_info {
     char *data;
     SEXP tail;
     Rconnection con;
+    int fd;
 } dybuf_info_t;
 
 #if R_VERSION < R_Version(3,3,0)
@@ -30,16 +32,40 @@ static Rconnection R_GetConnection(SEXP sConn) { return getConnection(asInteger(
 
 #define DEFAULT_CONN_BUFFER_SIZE 8388608 /* 8Mb */
 
+/* we support:
+   iotools.stdout
+   iotools.stderr
+   iotools.fd(<fd-integer>)
+*/
+static int parseFD(SEXP sConn) {
+    if (TYPEOF(sConn) != SYMSXP && TYPEOF(sConn) != LANGSXP)
+	return 0; /* no sybol or lang = no FD */
+    if (sConn == Rf_install("iotools.stdout")) return 1;
+    if (sConn == Rf_install("iotools.stderr")) return 2;
+    if (TYPEOF(sConn) == LANGSXP && CAR(sConn) == Rf_install("iotools.fd") &&
+	TYPEOF(CADR(sConn)) == INTSXP && LENGTH(CADR(sConn)) == 1)
+	return INTEGER(CADR(sConn))[0];
+    return 0;
+}
+
+/* returns 1 if sConn is *either* a connection or direct FD, otherwise 0 */
+static int isConnection(SEXP sConn) {
+    return (sConn && (inherits(sConn, "connection") || parseFD(sConn))) ? 1 : 0;
+}
+
 /* NOTE: retuns a *protected* object */
 SEXP dybuf_alloc(unsigned long size, SEXP sConn) {
     SEXP s = PROTECT(allocVector(VECSXP, 2));
-    SEXP r = SET_VECTOR_ELT(s, 0, list1(allocVector(RAWSXP, size)));
+    SEXP sR = PROTECT(allocVector(RAWSXP, size));
+    SEXP r = SET_VECTOR_ELT(s, 0, list1(sR));
     dybuf_info_t *d = (dybuf_info_t*) RAW(SET_VECTOR_ELT(s, 1, allocVector(RAWSXP, sizeof(dybuf_info_t))));
     d->pos  = 0;
     d->size = size;
     d->tail = r;
     d->data = (char*) RAW(CAR(r));
     d->con  = (sConn && inherits(sConn, "connection")) ? R_GetConnection(sConn) : 0;
+    d->fd   = parseFD(sConn);
+    UNPROTECT(1); /* sR */
     return s;
 }
 
@@ -58,7 +84,7 @@ void dybuf_add(SEXP s, const char *data, unsigned long len) {
     /* printf("[%lu/%lu] filled, need %lu more", d->pos, d->size, len); */
 
     /* if the output is connection-based, flush */
-    if (d->con) {
+    if (d->con) { /* connection */
 	long wr;
 	/* FIXME: should we try partial sends as well ? */
 	if ((wr = R_WriteConnection(d->con, d->data, d->pos)) != d->pos)
@@ -69,6 +95,21 @@ void dybuf_add(SEXP s, const char *data, unsigned long len) {
 	if (len > (d->size / 2)) {
 	    /* FIXME: (actually FIX R): WriteConnection should be using const void* */
 	    if ((wr = R_WriteConnection(d->con, (void*) data, len)) != len)
+		Rf_error("write failed, expected %lu, got %ld", len, wr);
+	} else { /* otherwise copy into the buffer */
+	    memcpy(d->data, data, len);
+	    d->pos = len;
+	}
+    } else if (d->fd) { /* raw file descriptor (or socket, really) */
+	long wr;
+	/* FIXME: should we try partial sends as well ? */
+	if ((wr = write(d->fd, (const void*) d->data, d->pos)) != d->pos)
+	    Rf_error("write failed, expected %lu, got %ld", d->pos, wr);
+	d->pos = 0;
+	/* if the extra content is substantially big, don't even
+	   bother storing it and send right away */
+	if (len > (d->size / 2)) {
+	    if ((wr = write(d->fd, (const void*) data, len)) != len)
 		Rf_error("write failed, expected %lu, got %ld", len, wr);
 	} else { /* otherwise copy into the buffer */
 	    memcpy(d->data, data, len);
@@ -107,6 +148,13 @@ SEXP dybuf_collect(SEXP s) {
 	    Rf_error("write failed, expected %lu, got %ld", d->pos, wr);
 	d->pos = 0;
 	return R_NilValue;
+    } else if (d->fd) {
+	long wr;
+	/* FIXME: should we try partial sends as well ? */
+	if ((wr = write(d->fd, d->data, d->pos)) != d->pos)
+	    Rf_error("write failed, expected %lu, got %ld", d->pos, wr);
+	d->pos = 0;
+	return R_NilValue;
     }
     while (d->tail != head) {
 	total += LENGTH(CAR(head));
@@ -122,7 +170,16 @@ SEXP dybuf_collect(SEXP s) {
 	head = CDR(head);
     }
     if (d->pos) memcpy(dst, RAW(CAR(head)), d->pos);
-    UNPROTECT(1);
+
+    /* unfortunately we cannot set the class, because writeRaw()
+       does is.vector() check which fails if the object has
+       a class and doesn't dispatch so we can't return TRUE :(
+       That is rather stupid, but nothing we can do about,
+       so we cannot flag our raw vectors with a class.
+
+       classgets(res, PROTECT(mkString("output")));
+    */
+    UNPROTECT(2);
     return res;
 }
 
@@ -245,7 +302,7 @@ SEXP as_output_matrix(SEXP sMat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNsep, 
     if (nrow < 0 || ncol < 0)
 	Rf_error("invalid/missing matrix dimensions");
 
-    int rownamesFlag = asInteger(sRownamesFlag);
+    int rownamesFlag = (TYPEOF(sRownamesFlag) == STRSXP) ? -1 : asInteger(sRownamesFlag);
 
     if (TYPEOF(sSep) != STRSXP || LENGTH(sSep) != 1)
 	Rf_error("sep must be a single string");
@@ -257,8 +314,13 @@ SEXP as_output_matrix(SEXP sMat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNsep, 
     char lend = '\n';
     SEXPTYPE what = TYPEOF(sMat);
     SEXP sRnames = Rf_getAttrib(sMat, R_DimNamesSymbol);
-    sRnames = isNull(sRnames) ? 0 : VECTOR_ELT(sRnames,0);
-    int isConn = inherits(sConn, "connection");
+    sRnames = isNull(sRnames) ? 0 : VECTOR_ELT(sRnames, 0);
+    if (TYPEOF(sRownamesFlag) == STRSXP) {
+	if (XLENGTH(sRownamesFlag) != nrow)
+	    Rf_error("length mismatch between rows (%ld) and keys (%ld)", (long) XLENGTH(sRownamesFlag), (long) nrow);
+	sRnames = sRownamesFlag;
+    }
+    int isConn = isConnection(sConn);
 
     R_xlen_t row_len = ((R_xlen_t) guess_size(what)) * (R_xlen_t) ncol;
 
@@ -310,7 +372,8 @@ SEXP as_output_dataframe(SEXP sWhat, SEXP sSep, SEXP sNsep, SEXP sRownamesFlag, 
     unsigned long row_len = 0;
     if (ncol)
 	nrow = XLENGTH(VECTOR_ELT(sWhat, 0));
-    int rownamesFlag = asInteger(sRownamesFlag);
+    /* 1 = use row names (TRUE), 0 = don't use row names (FALSE), -1 = user-supplied row names */
+    int rownamesFlag = (TYPEOF(sRownamesFlag) == STRSXP) ? -1 : asInteger(sRownamesFlag);
     if (TYPEOF(sSep) != STRSXP || LENGTH(sSep) != 1)
 	Rf_error("sep must be a single string");
     if (TYPEOF(sNsep) != STRSXP || LENGTH(sNsep) != 1)
@@ -318,12 +381,17 @@ SEXP as_output_dataframe(SEXP sWhat, SEXP sSep, SEXP sNsep, SEXP sRownamesFlag, 
     char sep = CHAR(STRING_ELT(sSep, 0))[0];
     char nsep = CHAR(STRING_ELT(sNsep, 0))[0];
     char lend = '\n';
-    SEXP sRnames = getAttrib0(sWhat, R_RowNamesSymbol);
-    int isConn = inherits(sConn, "connection"), mod = 0;
+    SEXP sRnames = (TYPEOF(sRownamesFlag) == STRSXP) ? sRownamesFlag : getAttrib0(sWhat, R_RowNamesSymbol);
+    int isConn = isConnection(sConn), mod = 0;
     int recycle = (asInteger(sRecycle) > 0) ? 1 : 0;
     SEXP as_character = R_NilValue;
     unsigned long *sizes = 0;
+    /* drop automatic row names */
     if (TYPEOF(sRnames) != STRSXP) sRnames = NULL;
+    if (rownamesFlag == -1 && !sRnames)
+	Rf_error("invalid keys value");
+    if (rownamesFlag == -1 && XLENGTH(sRnames) != nrow)
+	Rf_error("length mismatch between the number of rows and supplied keys");
     for (j = 0; j < ncol; j++) {
 	/* we have to call as.character() for objects with a class
 	   since they may require a different representation */
@@ -370,7 +438,9 @@ SEXP as_output_dataframe(SEXP sWhat, SEXP sSep, SEXP sNsep, SEXP sRownamesFlag, 
 	}
     }
 
+    /* FIXME: why is the estimate for row names just 1? */
     if (rownamesFlag == 1) row_len++;
+    if (rownamesFlag == -1) guess_size(STRSXP);
 
     SEXP buf = dybuf_alloc(isConn ? DEFAULT_CONN_BUFFER_SIZE : (row_len * nrow), sConn);
 
@@ -438,7 +508,7 @@ SEXP as_output_vector(SEXP sVector, SEXP sNsep, SEXP sNamesFlag, SEXP sConn) {
     }
     
     SEXPTYPE what = TYPEOF(sVector);
-    int isConn = inherits(sConn, "connection");
+    int isConn = isConnection(sConn);
     if (isNull(sRnames)) sRnames = 0;
 
     unsigned long row_len = ((unsigned long) guess_size(what));

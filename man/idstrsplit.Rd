@@ -84,6 +84,7 @@ iris_read <- it$nextElem()[-1,]
 # nextElem(it)
 names(iris_read) <- col_names
 print(head(iris_read))
+gc() ## close implicit connections
 unlink("iris.csv")
 }
 \keyword{iterator}
