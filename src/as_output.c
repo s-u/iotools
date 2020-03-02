@@ -531,3 +531,32 @@ SEXP as_output_vector(SEXP sVector, SEXP sNsep, SEXP sNamesFlag, SEXP sConn) {
     UNPROTECT(1 + mod);
     return res;
 }
+
+
+SEXP as_output_raw(SEXP sVector, SEXP sConn) {
+    R_xlen_t i = 0, n;
+    int isConn = isConnection(sConn);
+    int fd = parseFD(sConn);
+    Rconnection con;
+    if (!isConn)
+	Rf_error("invalid connection");
+    if (!fd)
+	con = R_GetConnection(sConn);
+    const char *d = (const char*) RAW(sVector);
+    n = XLENGTH(sVector);
+    if (fd)
+	while (i < n) {
+	    ssize_t r = write(fd, d + i, n - i);
+	    if (r < 1)
+		Rf_error("write error");
+	    i += r;
+	}
+    else
+	while (i < n) {
+	    size_t r = R_WriteConnection(con, (void*) (d + i), n - i);
+	    if (r < 1)
+		Rf_error("write error");
+	    i += r;
+	}
+    return R_NilValue;
+}

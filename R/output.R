@@ -35,12 +35,9 @@ as.output.matrix <- function(x, sep="|", nsep="\t", keys, con=NULL, ...) {
 as.output.table <- function(x, nsep="\t", keys=TRUE, con=NULL, ...)
   .Call(as_output_vector, x, as.character(nsep), keys, con)
 
-as.output.raw <- function(x, con=NULL, ...) {
-    if (inherits(con, "connection")) {
-        writeBin(x, con)
-        NULL
-    } else x
-}
+as.output.raw <- function(x, con=NULL, ...)
+  .Call(as_output_raw, x, con)
+
 
 iotools.stdout <- quote(iotools.stdout)
 iotools.stderr <- quote(iotools.stderr)
