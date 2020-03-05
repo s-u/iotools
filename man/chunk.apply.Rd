@@ -16,23 +16,23 @@ chunk.tapply(input, FUN, ..., sep = "\t", CH.MERGE = rbind, CH.MAX.SIZE = 335544
 %- maybe also 'usage' for other objects documented here.
 \arguments{
   \item{input}{Either a chunk reader or a file name or connection that
-  will be used to create a chunk reader}
+    will be used to create a chunk reader}
   \item{FUN}{Function to apply to each chunk}
   \item{\dots}{Additional parameters passed to \code{FUN}}
-  \item{sep}{for tapply, gives separator for the key over which to apply. Each line
-  is split at the first separator, and the value is treated as the key over which
-  to apply the function over.}
+  \item{sep}{for \code{tapply}, gives separator for the key over which
+    to apply. Each line is split at the first separator, and the value
+    is treated as the key over which to apply the function.}
   \item{CH.MERGE}{Function to call to merge results from all
-  chunks. Common values are \code{list} to get \code{lapply}-like
-  behavior, \code{rbind} for table-like output or \code{c} for a long
-  vector.}
+    chunks. Common values are \code{list} to get \code{lapply}-like
+    behavior, \code{rbind} for table-like output or \code{c} for a long
+    vector.}
   \item{CH.MAX.SIZE}{maximal size of each chunk in bytes}
   \item{parallel}{the number of parallel processes to use in the calculation (*nix only).}
 }
 \note{
   The input to \code{FUN} is the raw chunk, so typically it is
-  advisabe to use \code{\link{mstrsplit}} or similar function as the
-  first setep in \code{FUN}.
+  advisable to use \code{\link{mstrsplit}} or similar function as the
+  first step in \code{FUN}.
 }
 \value{
   The result of calling \code{CH.MERGE} on all chunk results.
