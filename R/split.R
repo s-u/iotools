@@ -69,7 +69,6 @@ dstrfw <- function(x, col_types, widths, nsep=NA, strict=TRUE, skip=0L, nrows=-1
     col.names <- c("rowindex", col.names)
     widths <- c(0L, widths) # Add fake width for row index; makes C code much cleaner
   }
-  ncol <- length(col_types)
 
   ncol <- length(col_types)
   col_types[col_types %in% c("real", "double")] <- "numeric"
