@@ -36,7 +36,7 @@ int Strtoi(const char *nptr, int base)
 
     errno = 0;
     res = strtol(nptr, &endp, base);
-    if (*endp != '\0') res = NA_INTEGER;
+    if (*endp != '\0' || endp == nptr) return NA_INTEGER;
     /* next can happen on a 64-bit platform */
     if (res > INT_MAX || res < INT_MIN) res = NA_INTEGER;
     if (errno == ERANGE) res = NA_INTEGER;
