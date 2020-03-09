@@ -250,14 +250,19 @@ SEXP chunk_read(SEXP sReader, SEXP sMaxSize, SEXP sTimeout) {
 
 SEXP chunk_apply(SEXP sReader, SEXP sMaxSize, SEXP sMerge, SEXP sFUN, SEXP rho, SEXP sDots) {
     SEXP head = R_NilValue, tail = R_NilValue, elt;
-    int pc = 0;
+    SEXP sAlloc = PROTECT(CONS(R_NilValue, R_NilValue)), sHead = PROTECT(CONS(R_NilValue, R_NilValue));
+    int pc = 2;
     while (LENGTH(elt = chunk_read(sReader, sMaxSize, R_NilValue)) > 0) {
-	SEXP val = eval(LCONS(sFUN, CONS(elt, sDots)), rho);
+	SEXP val = eval(PROTECT(LCONS(sFUN, PROTECT(CONS(PROTECT(elt), sDots)))), rho);
+	UNPROTECT(3);
 	if (head == R_NilValue) {
-	    tail = head = PROTECT(CONS(val, R_NilValue));
-	    pc++;
-	} else
-	    tail = SETCDR(tail, CONS(val, R_NilValue));
+	    /* we use pre-allocated CONS to avoid breaking the protection stack for head allocation */
+	    SETCAR(sHead, val);
+	    tail = head = sHead;
+	} else {
+	    tail = SETCDR(tail, CONS(PROTECT(val), R_NilValue));
+	    UNPROTECT(1);
+	}
     }
     if (sMerge != R_NilValue) {
 	head = eval(PROTECT(LCONS(sMerge, head)), rho);
