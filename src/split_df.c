@@ -112,8 +112,8 @@ SEXP df_split(SEXP s, SEXP sSep, SEXP sNamesSep, SEXP sResilient, SEXP sNcol,
            don't get surprised -- if there is no TZ R will
            render it in local time - which is correct but
            may confuse people that didn't use GMT to start with */
-        setAttrib(st, install("tzone"), mkString("GMT"));
-        UNPROTECT(1);
+        setAttrib(st, install("tzone"), PROTECT(mkString("GMT")));
+        UNPROTECT(2);
         break;
 
       case NILSXP:
