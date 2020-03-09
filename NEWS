@@ -1,3 +1,10 @@
+0.3-1	2020-03-10
+    *	make sure connections are closed in examples so
+	check doesn't complain
+
+    *	add PROTECT() to chunk.apply() and string singletons
+
+
 0.3-0	2020-03-09
     *	integers incorrectly parsed empty strings to 0
 	instead	of NA (#27)
