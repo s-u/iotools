@@ -84,7 +84,10 @@ iris_read <- it$nextElem()[-1,]
 # nextElem(it)
 names(iris_read) <- col_names
 print(head(iris_read))
-gc() ## close implicit connections
+
+## remove iterator, connections and files
+rm("it")
+gc(FALSE)
 unlink("iris.csv")
 }
 \keyword{iterator}

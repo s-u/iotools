@@ -74,6 +74,10 @@ imstrsplit(x, sep="|", nsep=NA, strict=TRUE, ncol = NA,
   it <- imstrsplit("iris_mm.io", type="numeric", nsep="\t")
   iris_mm <- it$nextElem()
   print(head(iris_mm))
+
+  ## remove iterator, connections and files
+  rm("it")
+  gc(FALSE)
   unlink("iris_mm.io")
 }
 \keyword{iterator}
