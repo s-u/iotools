@@ -21,3 +21,7 @@ about Hadoop. See [the WiKi page](https://github.com/s-u/iotools/wiki)
 for the idea and
 [hmr](http://rforge.net/doc/packages/hmr) function for
 the documentation.
+
+[![CRAN](https://img.shields.io/cran/v/iotools?color=%236b0&label=CRAN)](https://cran.r-project.org/package=iotools)
+[![RForge](https://img.shields.io/endpoint?label=RForge&url=https%3A%2F%2Frforge.net%2Fdo%2Fvershield%2Fiotools)](https://RForge.net/iotools)
+[![CI](https://travis-ci.com/s-u/iotools.svg?branch=master)](https://travis-ci.com/github/s-u/iotools)

@@ -1,0 +1,14 @@
+language: r
+r:
+  - devel
+sudo: false
+disable_homebrew: true
+cache: packages
+matrix:
+  include:
+  - os: linux
+    dist: bionic
+    sudo: required
+# The R support on Travis is currently broken on macos, disable for now
+#  - os: osx
+#    osx_image: xcode10.1
