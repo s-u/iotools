@@ -5,7 +5,8 @@ loading (non-binary) data to R. This package started as an attempt to
 provide high-performance parsing tools that minimize copying and avoid
 the use of strings when possible (see
 [mstrsplit](http://rforge.net/doc/packages/iotools/mstrsplit.html),
-for example).
+for example). A paper describing the full functionality for the package can be
+found [here](https://arxiv.org/pdf/1510.00041.pdf).
 
 To allow processing of arbitrarily large files we have added way to
 process chunk-wise input, making it possible to compute on streaming
