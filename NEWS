@@ -1,3 +1,8 @@
+0.3-2
+    *	minor changes for compatibility with write-barrier
+	and R-devel (no functional difference)
+
+
 0.3-1	2020-03-10
     *	make sure connections are closed in examples so
 	check doesn't complain
