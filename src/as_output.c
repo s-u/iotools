@@ -400,7 +400,7 @@ SEXP as_output_dataframe(SEXP sWhat, SEXP sSep, SEXP sNsep, SEXP sRownamesFlag, 
 	    if (!mod) {
 		/* shallow copy - we use it only internally so should be ok */
 		SEXP sData = PROTECT(allocVector(VECSXP, XLENGTH(sWhat)));
-		memcpy(&(VECTOR_ELT(sData, 0)), &(VECTOR_ELT(sWhat, 0)),
+		memcpy(DATAPTR(sData), DATAPTR(sWhat),
 		       sizeof(SEXP) * XLENGTH(sWhat));
 		sWhat = sData;
 		mod = 1;
