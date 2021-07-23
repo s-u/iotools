@@ -6,6 +6,9 @@
 
 #define MIN_CACHE 128
 
+#define RVECTOR_PTR(x) ((SEXP*)(DATAPTR(x)))
+#define RSTRING_PTR(x) ((SEXP*)(DATAPTR(x)))
+
 SEXP ctapply_(SEXP args) {
     SEXP rho, vec, by, fun, mfun, cdi = 0, cdv = 0, tmp, acc, tail, sDim, sDimNam, sRowNam = R_NilValue, sColNam = R_NilValue;
     int i = 0, n, cdlen, cols = 1, is_mat = 0, has_rownam = 0;
@@ -67,7 +70,7 @@ SEXP ctapply_(SEXP args) {
 	/* copy the index slice */
 	if (TYPEOF(by) == INTSXP) memcpy(INTEGER(cdi), INTEGER(by) + i0, sizeof(int) * N);
 	else if (TYPEOF(by) == REALSXP) memcpy(REAL(cdi), REAL(by) + i0, sizeof(double) * N);
-	else if (TYPEOF(by) == STRSXP) memcpy(STRING_PTR(cdi), STRING_PTR(by) + i0, sizeof(SEXP) * N);
+	else if (TYPEOF(by) == STRSXP) memcpy(RSTRING_PTR(cdi), RSTRING_PTR(by) + i0, sizeof(SEXP) * N);
 	/* copy the vector slice */
 	if (cols > 1)  {
 	    int col;
@@ -76,15 +79,15 @@ SEXP ctapply_(SEXP args) {
 	    for (col = 0; col < cols; col++, cskip += N, srcskip += n) {
 		if (TYPEOF(vec) == INTSXP) memcpy(INTEGER(cdv) + cskip, INTEGER(vec) + i0 + srcskip, sizeof(int) * N);
 		else if (TYPEOF(vec) == REALSXP) memcpy(REAL(cdv) + cskip, REAL(vec) + i0 + srcskip, sizeof(double) * N);
-		else if (TYPEOF(vec) == STRSXP) memcpy(STRING_PTR(cdv) + cskip, STRING_PTR(vec) + i0 + srcskip, sizeof(SEXP) * N);
-		else if (TYPEOF(vec) == VECSXP) memcpy(VECTOR_PTR(cdv) + cskip, VECTOR_PTR(vec) + i0 + srcskip, sizeof(SEXP) * N);
+		else if (TYPEOF(vec) == STRSXP) memcpy(RSTRING_PTR(cdv) + cskip, RSTRING_PTR(vec) + i0 + srcskip, sizeof(SEXP) * N);
+		else if (TYPEOF(vec) == VECSXP) memcpy(RVECTOR_PTR(cdv) + cskip, RVECTOR_PTR(vec) + i0 + srcskip, sizeof(SEXP) * N);
 	    }
 	} else {
 	    SETLENGTH(cdv, N);
 	    if (TYPEOF(vec) == INTSXP) memcpy(INTEGER(cdv), INTEGER(vec) + i0, sizeof(int) * N);
 	    else if (TYPEOF(vec) == REALSXP) memcpy(REAL(cdv), REAL(vec) + i0, sizeof(double) * N);
-	    else if (TYPEOF(vec) == STRSXP) memcpy(STRING_PTR(cdv), STRING_PTR(vec) + i0, sizeof(SEXP) * N);
-	    else if (TYPEOF(vec) == VECSXP) memcpy(VECTOR_PTR(cdv), VECTOR_PTR(vec) + i0, sizeof(SEXP) * N);
+	    else if (TYPEOF(vec) == STRSXP) memcpy(RSTRING_PTR(cdv), RSTRING_PTR(vec) + i0, sizeof(SEXP) * N);
+	    else if (TYPEOF(vec) == VECSXP) memcpy(RVECTOR_PTR(cdv), RVECTOR_PTR(vec) + i0, sizeof(SEXP) * N);
 	}
 	if (is_mat) {
 	    /* FIXME: could we re-use the same vector object? */
@@ -99,7 +102,7 @@ SEXP ctapply_(SEXP args) {
 		SEXP nRN = SET_VECTOR_ELT(nDN, 0, allocVector(STRSXP, N));
 		/* FIXME: do we need to duplicate colnams? In theory, yes, but what about practice? */
 		if (sColNam != R_NilValue) SET_VECTOR_ELT(nDN, 1, sColNam);
-		memcpy(VECTOR_PTR(nRN), VECTOR_PTR(sRowNam) + i0, sizeof(SEXP) * N);
+		memcpy(RVECTOR_PTR(nRN), RVECTOR_PTR(sRowNam) + i0, sizeof(SEXP) * N);
 		setAttrib(cdv, R_DimNamesSymbol, nDN);
 		UNPROTECT(1);
 	    }
