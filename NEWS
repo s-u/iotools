@@ -3,6 +3,8 @@
 	when a type that doesn't support LENGTH() is passed (such as
 	NULL).
 
+    *	CH.MAX.SIZE was ignored in chunk.apply() for parallel jobs
+
 
 0.3-2	2021-07-23
     *	minor changes for compatibility with write-barrier
