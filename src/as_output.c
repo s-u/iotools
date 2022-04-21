@@ -483,7 +483,7 @@ SEXP as_output_dataframe(SEXP sWhat, SEXP sSep, SEXP sNsep, SEXP sRownamesFlag, 
 }
 
 SEXP as_output_vector(SEXP sVector, SEXP sNsep, SEXP sNamesFlag, SEXP sConn) {
-    R_xlen_t len = XLENGTH(sVector), i;
+    if (sVector == R_NilValue) return allocVector(RAWSXP, 0);
     int key_flag = asInteger(sNamesFlag), mod = 0;
     if (TYPEOF(sNsep) != STRSXP || LENGTH(sNsep) != 1)
 	Rf_error("nsep must be a single string");
@@ -508,6 +508,7 @@ SEXP as_output_vector(SEXP sVector, SEXP sNsep, SEXP sNamesFlag, SEXP sConn) {
     }
     
     SEXPTYPE what = TYPEOF(sVector);
+    R_xlen_t len = XLENGTH(sVector), i;
     int isConn = isConnection(sConn);
     if (isNull(sRnames)) sRnames = 0;
 
