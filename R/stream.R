@@ -14,7 +14,7 @@ chunk.apply <- function(input, FUN, ..., CH.MERGE=rbind, CH.MAX.SIZE=33554432,
     worker_queue = list()
     # Fill the worker queue.
     for (i in 1:max(parallel, 1)) {
-      chunk = read.chunk(reader)
+      chunk = read.chunk(reader, max.size=CH.MAX.SIZE)
       if (length(chunk) == 0) {
         break
       }
@@ -23,7 +23,7 @@ chunk.apply <- function(input, FUN, ..., CH.MERGE=rbind, CH.MAX.SIZE=33554432,
     if (length(worker_queue) == 0) return(CH.MERGE(NULL))
 
     # Pre-fetch the next chunk if we not at the end of input.
-    if (length(chunk) > 0) chunk = read.chunk(reader)
+    if (length(chunk) > 0) chunk = read.chunk(reader, max.size=CH.MAX.SIZE)
 
     # Process the chunk-stream.
     ret=NULL
@@ -33,7 +33,7 @@ chunk.apply <- function(input, FUN, ..., CH.MERGE=rbind, CH.MAX.SIZE=33554432,
       worker_queue[1] = NULL
       if (length(chunk) > 0) {
         worker_queue[[length(worker_queue)+1]] = parallel::mcparallel(FUN(chunk, ...))
-        chunk = read.chunk(reader)
+        chunk = read.chunk(reader, max.size=CH.MAX.SIZE)
       }
       if (length(worker_queue) == 0) done = TRUE
     }
