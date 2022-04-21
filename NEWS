@@ -4,7 +4,7 @@
 	NULL).
 
 
-0.3-2	2021-06-16
+0.3-2	2021-07-23
     *	minor changes for compatibility with write-barrier
 	and R-devel (no functional difference)
 
