@@ -1,4 +1,10 @@
-0.3-2
+0.3-3
+    *	fix error/segfault (depending on R version) in as.output()
+	when a type that doesn't support LENGTH() is passed (such as
+	NULL).
+
+
+0.3-2	2021-06-16
     *	minor changes for compatibility with write-barrier
 	and R-devel (no functional difference)
 
