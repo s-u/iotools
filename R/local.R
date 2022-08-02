@@ -81,7 +81,7 @@ read.csv.raw = function(file, header=TRUE, sep=",", skip=0L, fileEncoding="",
   if (!missing(colClasses) && is.list(colClasses))
     colClasses = sapply(colClasses, function(v) class(v)[1])
 
-  r = readAsRaw(file, fileEncoding = fileEncoding)
+  r = if (is.raw(file)) file else readAsRaw(file, fileEncoding = fileEncoding)
   if (!missing(colClasses) && !all(is.na(colClasses)))
     colClasses[colClasses %in% c("real", "double")] = "numeric"
 
