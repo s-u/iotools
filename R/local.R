@@ -31,7 +31,12 @@ output.file <- function(x, file, formatter.output = NULL) {
 readAsRaw <- function (con, n, nmax, fileEncoding = "")
 {
   if (is.character(con)) {
-      if (missing(n)) n = file.info(con)$size
+      con = path.expand(con)
+      if (missing(n)) { ## one-shot file read
+          n = file.info(con)$size
+          if (!any(is.na(n)))
+              return(readBin(con, raw(), n))
+      }
       con = if(nzchar(fileEncoding))
             file(con, "rb", encoding = fileEncoding) else file(con, "rb")
       on.exit(close(con))
@@ -40,7 +45,7 @@ readAsRaw <- function (con, n, nmax, fileEncoding = "")
       open(con, "rb")
       on.exit(close(con))
   }
-  if (missing(n)) n = 65536L
+  if (missing(n) || any(is.na(n))) n = 1048576L
   if (missing(nmax)) nmax = Inf
   mode = summary.connection(con)$mode
 
@@ -58,7 +63,7 @@ readAsRaw <- function (con, n, nmax, fileEncoding = "")
     ans = raw()
     m = 0
     while(TRUE) {
-      this = readBin(con, what="raw", n = min(n, nmax - m), endian = .Platform$endian)
+      this = readBin(con, raw(), min(n, nmax - m))
       ans = c(ans, this)
       m = m + length(this)
       if ((length(this) < n) || (nmax - m <= 0) ) break
