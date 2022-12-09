@@ -1,0 +1,27 @@
+on: [push, pull_request]
+
+name: check
+
+jobs:
+  check:
+    runs-on: ${{ matrix.os }}
+
+    name: ${{ matrix.os }} R ${{ matrix.r-version }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ macOS-10.15, ubuntu-20.04, ubuntu-22.04, windows-2022 ]
+        r-version: [ release, devel ]
+
+    steps:
+      - uses: actions/checkout@v2
+        
+      - name: Install R
+        uses: s-u/R-actions/install@master
+        with:
+          r-version: ${{ matrix.r-version }}
+          tools: base
+
+      - uses: s-u/R-actions/pkg-check@master
+          check-flags: --as-cran
