@@ -1,6 +1,3 @@
-library(testthat)
-library(iotools)
-
 n = 100
 test_df = data.frame(col1 = sample(state.abb,n,TRUE),
                      col2 = sample(1:10,n,TRUE),

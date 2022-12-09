@@ -1,6 +1,3 @@
-library(testthat)
-library(iotools)
-
 p = 10
 n = 100
 
