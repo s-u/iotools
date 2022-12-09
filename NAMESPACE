@@ -14,6 +14,7 @@ useDynLib(iotools, as_output_vector)
 useDynLib(iotools, as_output_raw)
 useDynLib(iotools, stdout_writeBin)
 useDynLib(iotools, C_rbind)
+useDynLib(iotools, pl_accumulate, pl_call, pl_count)
 
 export(mstrsplit)
 export(dstrsplit)
