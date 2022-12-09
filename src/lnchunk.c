@@ -248,25 +248,58 @@ SEXP chunk_read(SEXP sReader, SEXP sMaxSize, SEXP sTimeout) {
     return R_NilValue;
 }
 
-SEXP chunk_apply(SEXP sReader, SEXP sMaxSize, SEXP sMerge, SEXP sFUN, SEXP rho, SEXP sDots) {
-    SEXP head = R_NilValue, tail = R_NilValue, elt;
+SEXP chunk_apply(SEXP sReader, SEXP sMaxSize, SEXP sMerge, SEXP sFUN, SEXP rho, SEXP sDots,
+		 SEXP sBinary, SEXP sInitial) {
+    SEXP head = R_NilValue, tail = R_NilValue, elt, res = 0;
     SEXP sHead = PROTECT(CONS(R_NilValue, R_NilValue));
+    int binary = (Rf_asInteger(sBinary) == 0) ? 0 : 1;
     int pc = 1;
+    if (sMerge == R_NilValue)
+	binary = 0; /* always accumulate if there is no merge function */
     while (LENGTH(elt = chunk_read(sReader, sMaxSize, R_NilValue)) > 0) {
 	SEXP val = eval(PROTECT(LCONS(sFUN, PROTECT(CONS(PROTECT(elt), sDots)))), rho);
 	UNPROTECT(3);
-	if (head == R_NilValue) {
-	    /* we use pre-allocated CONS to avoid breaking the protection stack for head allocation */
-	    SETCAR(sHead, val);
-	    tail = head = sHead;
-	} else {
-	    tail = SETCDR(tail, CONS(PROTECT(val), R_NilValue));
-	    UNPROTECT(1);
+	if (binary) {
+	    if (sInitial != R_NilValue) {
+		PROTECT(val);
+		res = eval(PROTECT(lang2(sInitial, val)), rho);
+		UNPROTECT(2);
+		PROTECT(res);
+		sInitial = R_NilValue; /* we won't apply it again */
+		/* the result stays protected */
+		pc++;
+	    } else {
+		if (!res) {
+		    /* this looks silly, but we need to match the assumption
+		       that there is a protected result which will be replaced by
+		       the call - i.e. res is always protected - even if it
+		       is R_NilValue */
+		    res = PROTECT(R_NilValue);
+		    pc++;
+		}
+		PROTECT(val);
+		res = eval(PROTECT(lang3(sMerge, res, val)), rho);
+		UNPROTECT(3); /* includes previously protected res */
+		PROTECT(res); /* new res, does not affect pc */
+	    }
+	} else { /* accumulate */
+	    if (head == R_NilValue) {
+		/* we use pre-allocated CONS to avoid breaking the protection stack for head allocation */
+		SETCAR(sHead, val);
+		tail = head = sHead;
+	    } else {
+		tail = SETCDR(tail, CONS(PROTECT(val), R_NilValue));
+		UNPROTECT(1);
+	    }
 	}
     }
-    if (sMerge != R_NilValue) {
-	head = eval(PROTECT(LCONS(sMerge, head)), rho);
-	pc++;
+    if (binary) /* for binary merge the result is in res */
+	head = res ? res : R_NilValue;
+    else {
+	if (sMerge != R_NilValue) {
+	    head = eval(PROTECT(LCONS(sMerge, head)), rho);
+	    pc++;
+	}
     }
     if (pc) UNPROTECT(pc);
     return head;
@@ -388,7 +421,7 @@ SEXP chunk_tapply(SEXP sReader, SEXP sMaxSize, SEXP sMerge, SEXP sSep, SEXP sFUN
 }
 
 SEXP pass(SEXP args) {
-  return CDR(args);
+    return CDR(args);
 }
 
 /* find out the size of the last key chunk

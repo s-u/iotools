@@ -9,7 +9,9 @@
   to each chunk, collecting the results.
 }
 \usage{
-chunk.apply(input, FUN, ..., CH.MERGE = rbind, CH.MAX.SIZE = 33554432, parallel=1)
+chunk.apply(input, FUN, ..., CH.MERGE = rbind, CH.MAX.SIZE = 33554432,
+            CH.PARALLEL=1L, CH.SEQUENTIAL=TRUE, CH.BINARY=FALSE,
+            CH.INITIAL=NULL)
 
 chunk.tapply(input, FUN, ..., sep = "\t", CH.MERGE = rbind, CH.MAX.SIZE = 33554432)
 }
@@ -27,7 +29,21 @@ chunk.tapply(input, FUN, ..., sep = "\t", CH.MERGE = rbind, CH.MAX.SIZE = 335544
     behavior, \code{rbind} for table-like output or \code{c} for a long
     vector.}
   \item{CH.MAX.SIZE}{maximal size of each chunk in bytes}
-  \item{parallel}{the number of parallel processes to use in the calculation (*nix only).}
+  \item{CH.PARALLEL}{the number of parallel processes to use in the
+    calculation (unix only).}
+  \item{CH.SEQUENTIAL}{logical, only relevant for parallel
+    processing. If \code{TRUE} then the chunks are guaranteed to be
+    processed in sequential order. If \code{FALSE} then the chunks may
+    be processed in any order to gain better performance.}
+  \item{CH.BINARY}{logical, if \code{TRUE} then \code{CH.MERGE} is a
+    binary function used to update the result object for each chunk,
+    effectively acting like the \code{Reduce} function. If \code{FALSE}
+    then the results from all chunks are accumulated first and then
+    \code{CH.MERGE} is called with all chunks as arguments. See below
+    for performance considerations.}
+  \item{CH.INITIAL}{Function which will be applied to the first chunk if
+    \code{CH.BINARY=TRUE}. If \code{NULL} then \code{CH.MERGE(NULL,
+      chunk)} is called instead.}
 }
 \note{
   The input to \code{FUN} is the raw chunk, so typically it is
@@ -35,15 +51,57 @@ chunk.tapply(input, FUN, ..., sep = "\t", CH.MERGE = rbind, CH.MAX.SIZE = 335544
   first step in \code{FUN}.
 }
 \value{
-  The result of calling \code{CH.MERGE} on all chunk results.
+  The result of calling \code{CH.MERGE} on all chunk results as
+  arguments (\code{CH.BINARY=FALSE}) or result of the last call to
+  binary \code{CH.MERGE}.
+}
+\details{
+  Due to the fact that chunk-wise processing is typically used when the
+  input data is too large to fit in memory, there are additional
+  considerations depending on whether the results after applying
+  \code{FUN} are itself large or not. If they are not, then the apporach
+  of accumulating them and then applying \code{CH.MERGE} on all results
+  at once is typically the most efficient and it is what
+  \code{CH.BINARY=FALSE} will do.
+
+  However, in some situations where the result are resonably big or
+  the number of chunks is very high, it may be more efficient to update
+  a sort of state based on each arriving chunk instead of collecting all
+  results. This can be achieved by setting \code{CH.BINARY=TRUE} in which
+  case the process is equivalent to:
+  \preformatted{res <- CH.INITIAL(FUN(chunk1))
+res <- CH.MERGE(res, FUN(chunk2))
+res <- CH.MERGE(res, FUN(chunk3))
+...
+res}
+
+  If \code{CH.INITITAL} is \code{NULL} then the first line is
+  \code{res <- CH.MERGE(NULL, FUN(chunk1))}.
+
+  The parameter \code{CH.SEQUENTIAL} is only used if parallel
+  processing is requested. It allows the system to process chunks out of
+  order for performace reasons. If it is \code{TRUE} then the order of
+  the chunks is respected, but merging can only proceed if the result of
+  the next chunk is avaiable. With \code{CH.SEQUENTIAL=FALSE} the workers
+  will continue processing further chunks as they become avaiable, not
+  waiting for the results of the preceding calls. This is more
+  efficient, but the order of the chunks in the result is not
+  deterministic.
+
+  Note that if parallel processing is required then all calls to
+  \code{FUN} should be considered independent. However, \code{CH.MERGE}
+  is always run in the current session and thus is allowed to have
+  side-effects.
 }
 %\references{
 %}
 \author{
- Simon Urbanek
+  Simon Urbanek
 }
-%\note{
-%}
+\note{
+  The support for \code{CH.PARALLEL} is considered experimental and may
+  change in the future.
+}
 %\seealso{
 %}
 \examples{
@@ -52,8 +110,8 @@ chunk.tapply(input, FUN, ..., sep = "\t", CH.MERGE = rbind, CH.MAX.SIZE = 335544
 ## of at most 10kB size
 chunk.apply("input.file.txt",
             function(o) {
-              m = mstrsplit(o)
-              quantile(as.numeric(m[,1]), c(0.25, 0.5, 0.75))
+              m = mstrsplit(o, type='numeric')
+              quantile(m[,1], c(0.25, 0.5, 0.75))
             }, CH.MAX.SIZE=1e5)
 }
 }
