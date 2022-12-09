@@ -24,4 +24,5 @@ jobs:
           tools: base
 
       - uses: s-u/R-actions/pkg-check@master
+        with:
           check-flags: --as-cran
