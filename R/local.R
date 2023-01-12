@@ -167,7 +167,7 @@ chunk.map = function(input, output = NULL, formatter = .default.formatter,
   if (skip > 0L) readLines(input, n=skip)
   cr = chunk.reader(input, max.line = max.line, sep = key.sep)
 
-  while ( length(r <- read.chunk(cr)) ) {
+  while ( length(r <- read.chunk(cr, max.size = max.size)) ) {
     val = FUN(formatter(r), ...)
 
     if (!is.null(output)) {
