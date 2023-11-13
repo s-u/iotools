@@ -53,7 +53,6 @@ static int isConnection(SEXP sConn) {
     return (sConn && (inherits(sConn, "connection") || parseFD(sConn))) ? 1 : 0;
 }
 
-/* NOTE: retuns a *protected* object */
 SEXP dybuf_alloc(unsigned long size, SEXP sConn) {
     SEXP s = PROTECT(allocVector(VECSXP, 2));
     SEXP sR = PROTECT(allocVector(RAWSXP, size));
@@ -65,7 +64,7 @@ SEXP dybuf_alloc(unsigned long size, SEXP sConn) {
     d->data = (char*) RAW(CAR(r));
     d->con  = (sConn && inherits(sConn, "connection")) ? R_GetConnection(sConn) : 0;
     d->fd   = parseFD(sConn);
-    UNPROTECT(1); /* sR */
+    UNPROTECT(2); /* s, sR */
     return s;
 }
 
@@ -179,7 +178,7 @@ SEXP dybuf_collect(SEXP s) {
 
        classgets(res, PROTECT(mkString("output")));
     */
-    UNPROTECT(2);
+    UNPROTECT(1);
     return res;
 }
 
@@ -327,6 +326,7 @@ SEXP as_output_matrix(SEXP sMat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNsep, 
     if (rownamesFlag) row_len += 8;
 
     SEXP buf = dybuf_alloc(isConn ? DEFAULT_CONN_BUFFER_SIZE : (row_len * nrow), sConn);
+    PROTECT(buf);
     R_xlen_t i, j;
 
     for (i = 0; i < nrow; i++) {
@@ -370,6 +370,7 @@ SEXP as_output_dataframe(SEXP sWhat, SEXP sSep, SEXP sNsep, SEXP sRownamesFlag, 
     unsigned long ncol = XLENGTH(sWhat);
     unsigned long nrow = 0;
     unsigned long row_len = 0;
+    int nprotect = 0;
     if (ncol)
 	nrow = XLENGTH(VECTOR_ELT(sWhat, 0));
     /* 1 = use row names (TRUE), 0 = don't use row names (FALSE), -1 = user-supplied row names */
@@ -400,6 +401,7 @@ SEXP as_output_dataframe(SEXP sWhat, SEXP sSep, SEXP sNsep, SEXP sRownamesFlag, 
 	    if (!mod) {
 		/* shallow copy - we use it only internally so should be ok */
 		SEXP sData = PROTECT(allocVector(VECSXP, XLENGTH(sWhat)));
+		nprotect++;
 		memcpy(DATAPTR(sData), DATAPTR(sWhat),
 		       sizeof(SEXP) * XLENGTH(sWhat));
 		sWhat = sData;
@@ -432,6 +434,7 @@ SEXP as_output_dataframe(SEXP sWhat, SEXP sSep, SEXP sNsep, SEXP sRownamesFlag, 
 	    recycle = 0;
 	else { /* cache lengths since XLENGTH is actually not a cheap operation */
 	    SEXP foo = PROTECT(allocVector(RAWSXP, sizeof(long) * ncol));
+	    nprotect++;
 	    sizes = (unsigned long*) RAW(foo);
 	    for (j = 0; j < ncol; j++)
 		sizes[j] = (unsigned long) XLENGTH(VECTOR_ELT(sWhat, j));
@@ -443,6 +446,8 @@ SEXP as_output_dataframe(SEXP sWhat, SEXP sSep, SEXP sNsep, SEXP sRownamesFlag, 
     if (rownamesFlag == -1) guess_size(STRSXP);
 
     SEXP buf = dybuf_alloc(isConn ? DEFAULT_CONN_BUFFER_SIZE : (row_len * nrow), sConn);
+    PROTECT(buf);
+    nprotect++;
 
     for (i = 0; i < nrow; i++) {
 	if (rownamesFlag) {
@@ -475,10 +480,8 @@ SEXP as_output_dataframe(SEXP sWhat, SEXP sSep, SEXP sNsep, SEXP sRownamesFlag, 
 	dybuf_add1(buf, lend);
     }
 
-    if (recycle) UNPROTECT(1); /* sizes cache */
-    if (mod) UNPROTECT(1); /* sData */
     SEXP res = dybuf_collect(buf);
-    UNPROTECT(1); /* buffer */
+    UNPROTECT(nprotect);
     return res;
 }
 
@@ -490,12 +493,16 @@ SEXP as_output_vector(SEXP sVector, SEXP sNsep, SEXP sNamesFlag, SEXP sConn) {
     char nsep = CHAR(STRING_ELT(sNsep, 0))[0];
     char lend = '\n';
     SEXP sRnames = Rf_getAttrib(sVector, R_NamesSymbol);
+    int nprotect = 0;
+    PROTECT(sRnames);
+    nprotect++;
     if (requires_as_character(sVector)) {
 	SEXP as_character = Rf_install("as.character");
 	SEXP asc = PROTECT(lang2(as_character, sVector));
 	sVector = eval(asc, R_GlobalEnv);
 	UNPROTECT(1);
 	PROTECT(sVector);
+	nprotect++;
 	mod = 1;
 	/* since as.character() drops names, we want re-use original names, but that
 	   means we have to check if it is actually meaningful. We do NOT perform
@@ -516,6 +523,8 @@ SEXP as_output_vector(SEXP sVector, SEXP sNsep, SEXP sNamesFlag, SEXP sConn) {
     if (key_flag) row_len += 8;
 
     SEXP buf = dybuf_alloc(isConn ? DEFAULT_CONN_BUFFER_SIZE : row_len, sConn);
+    PROTECT(buf);
+    nprotect++;
 
     for (i = 0; i < len; i++) {
 	if (key_flag) {
@@ -529,7 +538,7 @@ SEXP as_output_vector(SEXP sVector, SEXP sNsep, SEXP sNamesFlag, SEXP sConn) {
 	dybuf_add1(buf, lend);
     }
     SEXP res = dybuf_collect(buf);
-    UNPROTECT(1 + mod);
+    UNPROTECT(nprotect);
     return res;
 }
 
