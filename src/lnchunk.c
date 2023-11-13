@@ -377,7 +377,6 @@ SEXP chunk_tapply(SEXP sReader, SEXP sMaxSize, SEXP sMerge, SEXP sSep, SEXP sFUN
 		    w = CDR(w);
 		}
 		memcpy(ptr, RAW(elt), hold);
-		PROTECT(nv);  /* new elt */
 		w = PROTECT(allocVector(RAWSXP, LENGTH(elt) - hold));
 		memcpy(RAW(w), RAW(elt) + hold, LENGTH(elt) - hold);
 		SETCAR(cache, w);
@@ -416,7 +415,7 @@ SEXP chunk_tapply(SEXP sReader, SEXP sMaxSize, SEXP sMerge, SEXP sSep, SEXP sFUN
 	head = eval(PROTECT(LCONS(sMerge, head)), rho);
 	pc++;
     }
-    if (pc) UNPROTECT(pc);
+    UNPROTECT(pc);
     return head;
 }
 
