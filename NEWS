@@ -1,4 +1,11 @@
-0.3-3
+0.3-4	2023-11-28
+    *	pass max.size argument through chunk.map() (#39)
+
+    *	minor change to work around rchk not being able to follow
+	protections across functions.
+
+
+0.3-3	2022-12-09
     *	fix error/segfault (depending on R version) in as.output()
 	when a type that doesn't support LENGTH() is passed (such as
 	NULL).
