@@ -149,7 +149,7 @@ SEXP df_split_fw(SEXP s, SEXP sColWidths, SEXP sNamesSep,
       while (l < le) {
 	  if ((le - l) < width[i]) { /* not enough in the line to process next column */
 	      if (resilient) break;
-	      Rf_error("line %lu: input line is too short (need %u, have %u)", k, width[i], (le - l));
+	      Rf_error("line %lu: input line is too short (need %u, have %u)", (unsigned long) k, (unsigned) width[i], (unsigned) (le - l));
 	  }
 
 	  if (c) c += width[i];
