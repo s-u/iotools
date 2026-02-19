@@ -1,3 +1,12 @@
+0.4-0	2025-02-19
+    *	chunk.tapply() has been fully re-written and it takes advantage
+	key-aware chunk reader. The sep= argument is ignored if the
+	input is a chunk reader and defaults to "\t" otherwise.
+
+    *	The implementation now works both with and without growabale
+	vector API and across a wide range of R versions.
+
+
 0.3-5	2023-11-29
     *	add format casts
 
