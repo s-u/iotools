@@ -13,6 +13,8 @@
 #include <Rversion.h>
 #include <R_ext/Connections.h>
 
+#include "rcompat.h"
+
 #if R_CONNECTIONS_VERSION != 1
 #error "Missing or unsupported connection API in R"
 #endif
