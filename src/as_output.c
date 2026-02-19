@@ -10,6 +10,7 @@
 #define FL_RESILIENT 1 /* do not fail, proceed even if the input has more columns */
 
 #include "utils.h"
+#include "rcompat.h"
 
 /* FIXME: use long to simplify dealing with 32-bit vs 64-bit indexing,
    but that doesn't work on Windows where MS has brain-deadly defined
@@ -355,13 +356,35 @@ SEXP as_output_matrix(SEXP sMat, SEXP sNrow, SEXP sNcol, SEXP sSep, SEXP sNsep, 
 
 /* getAttrib() is broken when trying to access R_RowNamesSymbol
    in more recent R versions so we have to work around that ourselves */
-static SEXP getAttrib0(SEXP vec, SEXP name) {
-  SEXP s;
-  for (s = ATTRIB(vec); s != R_NilValue; s = CDR(s))
-    if (TAG(s) == name) return CAR(s);
-  return R_NilValue;
+#if R_VERSION >= R_Version(4,6,0) /* use map API in 4.6.0+ instead of iterating ourselves */
+static SEXP find1Attr(SEXP tag, SEXP attr, void* findTag) {
+    return (tag == (SEXP) findTag) ? attr : 0;
 }
+static SEXP getAttrib0(SEXP vec, SEXP name) {
+    return R_mapAttrib(vec, find1Attr, (void*) name);
+}
+#else
+static SEXP getAttrib0(SEXP vec, SEXP name) {
+    SEXP s;
+    for (s = ATTRIB(vec); s != R_NilValue; s = CDR(s))
+	if (TAG(s) == name) return CAR(s);
+    return R_NilValue;
+}
+#endif
 
+#if R_VERSION < R_Version(3,1,0)
+/* we only use it on guaranteeed VECSXP */
+static SEXP Rf_shallow_duplicate(SEXP x) {
+    unsigned long i = 0, n = (unsigned long) XLENGTH(x);
+    SEXP res = PROTECT(Rf_allocVector(VECSXP, XLENGTH(x)));
+    while (i < n) {
+	SET_VECTOR_ELT(res, i, VECTOR_ELT(x, i));
+	i++;
+    }
+    UNPROTECT(1);
+    return res;
+}
+#endif
 
 SEXP as_output_dataframe(SEXP sWhat, SEXP sSep, SEXP sNsep, SEXP sRownamesFlag, SEXP sConn, SEXP sRecycle) {
     unsigned long i, j;
@@ -399,12 +422,8 @@ SEXP as_output_dataframe(SEXP sWhat, SEXP sSep, SEXP sNsep, SEXP sRownamesFlag, 
 	if (requires_as_character(VECTOR_ELT(sWhat, j))) {
 	    /* did we create a modified copy yet? If not, do so */
 	    if (!mod) {
-		/* shallow copy - we use it only internally so should be ok */
-		SEXP sData = PROTECT(allocVector(VECSXP, XLENGTH(sWhat)));
+		sWhat = PROTECT(Rf_shallow_duplicate(sWhat));
 		nprotect++;
-		memcpy(DATAPTR(sData), DATAPTR(sWhat),
-		       sizeof(SEXP) * XLENGTH(sWhat));
-		sWhat = sData;
 		mod = 1;
 		as_character = Rf_install("as.character");
 	    }
@@ -487,7 +506,7 @@ SEXP as_output_dataframe(SEXP sWhat, SEXP sSep, SEXP sNsep, SEXP sRownamesFlag, 
 
 SEXP as_output_vector(SEXP sVector, SEXP sNsep, SEXP sNamesFlag, SEXP sConn) {
     if (sVector == R_NilValue) return allocVector(RAWSXP, 0);
-    int key_flag = asInteger(sNamesFlag), mod = 0;
+    int key_flag = asInteger(sNamesFlag);
     if (TYPEOF(sNsep) != STRSXP || LENGTH(sNsep) != 1)
 	Rf_error("nsep must be a single string");
     char nsep = CHAR(STRING_ELT(sNsep, 0))[0];
@@ -503,7 +522,6 @@ SEXP as_output_vector(SEXP sVector, SEXP sNsep, SEXP sNamesFlag, SEXP sConn) {
 	UNPROTECT(1);
 	PROTECT(sVector);
 	nprotect++;
-	mod = 1;
 	/* since as.character() drops names, we want re-use original names, but that
 	   means we have to check if it is actually meaningful. We do NOT perform
 	   re-cycling since mismatches are unlikely intentional. */

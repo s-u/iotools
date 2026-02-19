@@ -4,13 +4,12 @@
 #define USE_RINTERNALS 1
 #include <Rinternals.h>
 
+#include "rcompat.h"
+
 #define MIN_CACHE 128
 
-#define RVECTOR_PTR(x) ((SEXP*)(DATAPTR(x)))
-#define RSTRING_PTR(x) ((SEXP*)(DATAPTR(x)))
-
 SEXP ctapply_(SEXP args) {
-    SEXP rho, vec, by, fun, mfun, cdi = 0, cdv = 0, tmp, acc, tail, sDim, sDimNam, sRowNam = R_NilValue, sColNam = R_NilValue;
+    SEXP rho, vec, by, fun, mfun, cdv = 0, tmp, acc, tail, sDim, sDimNam, sRowNam = R_NilValue, sColNam = R_NilValue;
     int i = 0, n, cdlen, cols = 1, is_mat = 0, has_rownam = 0;
     
     args = CDR(args);
@@ -57,67 +56,47 @@ SEXP ctapply_(SEXP args) {
 	}
 	/* [i0, i - 1] is the interval to run on */
 	N = i - i0;
-	/* allocate cache for both the vector and index */
-	if (!cdi) {
-	    /* we have to guarantee named > 0 since we'll be modifying it in-place */
-	    SET_NAMED(cdi = SET_VECTOR_ELT(tmp, 0, allocVector(TYPEOF(by), (cdlen = ((N < MIN_CACHE) ? MIN_CACHE : N)))), 1);
-	    SET_NAMED(cdv = SET_VECTOR_ELT(tmp, 1, allocVector(TYPEOF(vec), cdlen * cols)), 1);
-	} else if (cdlen < N) {
-	    SET_NAMED(cdi = SET_VECTOR_ELT(tmp, 0, allocVector(TYPEOF(by), (cdlen = N))), 1);
-	    SET_NAMED(cdv = SET_VECTOR_ELT(tmp, 1, allocVector(TYPEOF(vec), cdlen * cols)), 1);
-	}
-	SETLENGTH(cdi, N);
-	/* copy the index slice */
-	if (TYPEOF(by) == INTSXP) memcpy(INTEGER(cdi), INTEGER(by) + i0, sizeof(int) * N);
-	else if (TYPEOF(by) == REALSXP) memcpy(REAL(cdi), REAL(by) + i0, sizeof(double) * N);
-	else if (TYPEOF(by) == STRSXP) memcpy(RSTRING_PTR(cdi), RSTRING_PTR(by) + i0, sizeof(SEXP) * N);
+	/* growable vectors are mostly not worth it, so use clean vectors */
+	cdv = PROTECT(Rf_allocVector(TYPEOF(vec), (cdlen = N) * cols));
 	/* copy the vector slice */
 	if (cols > 1)  {
 	    int col;
 	    int cskip = 0, srcskip = 0;
-	    SETLENGTH(cdv, N * cols);
 	    for (col = 0; col < cols; col++, cskip += N, srcskip += n) {
-		if (TYPEOF(vec) == INTSXP) memcpy(INTEGER(cdv) + cskip, INTEGER(vec) + i0 + srcskip, sizeof(int) * N);
-		else if (TYPEOF(vec) == REALSXP) memcpy(REAL(cdv) + cskip, REAL(vec) + i0 + srcskip, sizeof(double) * N);
-		else if (TYPEOF(vec) == STRSXP) memcpy(RSTRING_PTR(cdv) + cskip, RSTRING_PTR(vec) + i0 + srcskip, sizeof(SEXP) * N);
-		else if (TYPEOF(vec) == VECSXP) memcpy(RVECTOR_PTR(cdv) + cskip, RVECTOR_PTR(vec) + i0 + srcskip, sizeof(SEXP) * N);
+		if (TYPEOF(vec) == INTSXP) memcpy(INTEGER(cdv) + cskip, INTEGER_RO(vec) + i0 + srcskip, sizeof(int) * N);
+		else if (TYPEOF(vec) == REALSXP) memcpy(REAL(cdv) + cskip, REAL_RO(vec) + i0 + srcskip, sizeof(double) * N);
+		else if (TYPEOF(vec) == STRSXP) memcpy(STRING_PTR_RW(cdv) + cskip, STRING_PTR_RO(vec) + i0 + srcskip, sizeof(SEXP) * N);
+		else if (TYPEOF(vec) == VECSXP) memcpy(VECTOR_PTR_RW(cdv) + cskip, VECTOR_PTR_RO(vec) + i0 + srcskip, sizeof(SEXP) * N);
 	    }
 	} else {
-	    SETLENGTH(cdv, N);
-	    if (TYPEOF(vec) == INTSXP) memcpy(INTEGER(cdv), INTEGER(vec) + i0, sizeof(int) * N);
-	    else if (TYPEOF(vec) == REALSXP) memcpy(REAL(cdv), REAL(vec) + i0, sizeof(double) * N);
-	    else if (TYPEOF(vec) == STRSXP) memcpy(RSTRING_PTR(cdv), RSTRING_PTR(vec) + i0, sizeof(SEXP) * N);
-	    else if (TYPEOF(vec) == VECSXP) memcpy(RVECTOR_PTR(cdv), RVECTOR_PTR(vec) + i0, sizeof(SEXP) * N);
+	    if (TYPEOF(vec) == INTSXP) memcpy(INTEGER(cdv), INTEGER_RO(vec) + i0, sizeof(int) * N);
+	    else if (TYPEOF(vec) == REALSXP) memcpy(REAL(cdv), REAL_RO(vec) + i0, sizeof(double) * N);
+	    else if (TYPEOF(vec) == STRSXP) memcpy(STRING_PTR_RW(cdv), STRING_PTR_RO(vec) + i0, sizeof(SEXP) * N);
+	    else if (TYPEOF(vec) == VECSXP) memcpy(VECTOR_PTR_RW(cdv), VECTOR_PTR_RO(vec) + i0, sizeof(SEXP) * N);
 	}
 	if (is_mat) {
-	    /* FIXME: could we re-use the same vector object? */
 	    SEXP nDim = PROTECT(allocVector(INTSXP, 2));
 	    INTEGER(nDim)[0] = N;
 	    INTEGER(nDim)[1] = cols;
 	    setAttrib(cdv, R_DimSymbol, nDim);
 	    UNPROTECT(1);
 	    if (has_rownam) {
-		/* FIXME: if those are unused, we could use a cache as well ... */
 		SEXP nDN = PROTECT(allocVector(VECSXP, 2));
 		SEXP nRN = SET_VECTOR_ELT(nDN, 0, allocVector(STRSXP, N));
-		/* FIXME: do we need to duplicate colnams? In theory, yes, but what about practice? */
 		if (sColNam != R_NilValue) SET_VECTOR_ELT(nDN, 1, sColNam);
-		memcpy(RVECTOR_PTR(nRN), RVECTOR_PTR(sRowNam) + i0, sizeof(SEXP) * N);
+		for (int rni = 0; rni < N; rni++)
+		    SET_STRING_ELT(nRN, rni, STRING_ELT(sRowNam, rni + i0));
 		setAttrib(cdv, R_DimNamesSymbol, nDN);
 		UNPROTECT(1);
 	    }
 	}
 	eres = eval(PROTECT(LCONS(fun, CONS(cdv, args))), rho);
-	UNPROTECT(1); /* eval arg */
+	UNPROTECT(2); /* eval arg + cdv */
 	/* if the result has NAMED > 1 then we have to duplicate it
 	   see ctapply(x, y, identity). It should be uncommon, though
-	   since most functions will return newly allocated objects
-
-	   FIXME: check NAMED == 1 -- may also be bad if the reference is outside,
-	   but then NAMED1 should be duplicated before modification so I think we're safe
-	*/
+	   since most functions will return newly allocated objects */
 	/* Rprintf("NAMED(eres)=%d\n", NAMED(eres)); */
-	if (NAMED(eres) > 1) eres = duplicate(eres);
+	if (MAYBE_SHARED(eres)) eres = duplicate(eres);
 	PROTECT(eres);
 	if (!acc) tail = acc = SET_VECTOR_ELT(tmp, 2, list1(eres));
 	else tail = SETCDR(tail, list1(eres));

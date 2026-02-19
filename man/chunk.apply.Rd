@@ -13,7 +13,7 @@ chunk.apply(input, FUN, ..., CH.MERGE = rbind, CH.MAX.SIZE = 33554432,
             CH.PARALLEL=1L, CH.SEQUENTIAL=TRUE, CH.BINARY=FALSE,
             CH.INITIAL=NULL)
 
-chunk.tapply(input, FUN, ..., sep = "\t", CH.MERGE = rbind, CH.MAX.SIZE = 33554432)
+chunk.tapply(input, FUN, ..., sep, CH.MERGE = rbind, CH.MAX.SIZE = 33554432)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -21,9 +21,14 @@ chunk.tapply(input, FUN, ..., sep = "\t", CH.MERGE = rbind, CH.MAX.SIZE = 335544
     will be used to create a chunk reader}
   \item{FUN}{Function to apply to each chunk}
   \item{\dots}{Additional parameters passed to \code{FUN}}
-  \item{sep}{for \code{tapply}, gives separator for the key over which
-    to apply. Each line is split at the first separator, and the value
-    is treated as the key over which to apply the function.}
+  \item{sep}{singe character string. For \code{tapply}, gives
+    separator for the key over which to apply. Each line is split at the
+    first separator, and the preceding value is treated as the key over
+    which to apply the function. If the \code{input} is a chunk reader,
+    then this value is ignored (can be missing) and the key separator of
+    the chunk reader is always used, otherwise defaults to \code{"\t"}
+    and the corresponding chunk reader with that key separator is
+    created internally.}
   \item{CH.MERGE}{Function to call to merge results from all
     chunks. Common values are \code{list} to get \code{lapply}-like
     behavior, \code{rbind} for table-like output or \code{c} for a long
