@@ -122,12 +122,25 @@ static SEXP key_process(chunk_read_t *r, SEXP val) {
 	    if (r->cache == R_NilValue)
 		R_PreserveObject(r->cache = r->tail = CONS(R_NilValue, R_NilValue));
 	    /* create a cache vector */
-	    nv = PROTECT(allocVector(RAWSXP, LENGTH(val) - hold));
+	    nv = PROTECT(Rf_allocVector(RAWSXP, LENGTH(val) - hold));
 	    memcpy(RAW(nv), RAW(val) + hold, LENGTH(nv));
 	    r->tail = SETCDR(r->tail, CONS(nv, R_NilValue));
 	    r->in_cache = LENGTH(nv);
 	    /* shorten val */
+#ifdef HAVE_SETLENGTH /* < 4.5.0 */
 	    SETLENGTH(val, hold);
+#else /* >= 4.5.0 */
+#ifdef HAVE_RESIZE_VECTOR /* >= 4.6.0 */
+	    if (R_isResizable(val))
+		R_resizeVector(val, hold);
+	    else
+#endif
+	    { /* 4.5.x and 4.6.0+ if not resizable */
+		SEXP oval = Rf_allocVector(RAWSXP, hold);
+		memcpy(RAW(oval), RAW(val), hold);
+		val = oval;
+	    }
+#endif /* ! HAVE_SETLENGTH */
 	    UNPROTECT(2); /* nv, val */
 	    return val;
 	}
@@ -154,6 +167,15 @@ static SEXP key_process(chunk_read_t *r, SEXP val) {
     return R_NilValue; /* special case - this is not an empty vector but rather saying that we need to read again */
 }
 
+static char chunk_reader_keysep(SEXP sReader) {
+    chunk_read_t *r;
+    if (!inherits(sReader, reader_class))
+	Rf_error("invalid reader");
+    r = (chunk_read_t*) R_ExternalPtrAddr(sReader);
+    if (!r) Rf_error("invalid NULL reader");
+    return r->keySep;
+}
+
 SEXP chunk_read(SEXP sReader, SEXP sMaxSize, SEXP sTimeout) {
     SEXP res;
     int max_size = asInteger(sMaxSize), i, n;
@@ -168,7 +190,7 @@ SEXP chunk_read(SEXP sReader, SEXP sMaxSize, SEXP sTimeout) {
     if (max_size < r->alloc) Rf_error("invalid max.size - must be more than the max. line (%d)", r->alloc);
 
  retry:
-    res = PROTECT(allocVector(RAWSXP, max_size));
+    res = PROTECT(R_allocResizableVector(RAWSXP, max_size));
     c = (char*) RAW(res);
     if ((i = r->len)) {
 	memcpy(c, r->buf, r->len);
@@ -225,7 +247,16 @@ SEXP chunk_read(SEXP sReader, SEXP sMaxSize, SEXP sTimeout) {
 		r->len = n - i - 1;
 		memcpy(r->buf, c + i + 1, r->len);
 	    }
-	    SETLENGTH(res, i + 1); /* include the newline */
+#if (defined HAVE_SETLENGTH) || (defined HAVE_RESIZE_VECTOR)
+	    R_resizeVector(res, i + 1); /* include the newline */
+#else
+	    { /* cannot shorten, must alloc + copy */
+		SEXP cpy = Rf_allocVector(RAWSXP, i + 1);
+		memcpy(RAW(cpy), RAW(res), i + 1);
+		UNPROTECT(1);
+		res = PROTECT(cpy);
+	    }
+#endif
 	    if (r->keySep) {
 		res = key_process(r, res);
 		if (res == R_NilValue) {
@@ -308,114 +339,123 @@ SEXP chunk_apply(SEXP sReader, SEXP sMaxSize, SEXP sMerge, SEXP sFUN, SEXP rho, 
 SEXP last_key_back(SEXP sRaw, SEXP sKeySep);
 
 SEXP chunk_tapply(SEXP sReader, SEXP sMaxSize, SEXP sMerge, SEXP sSep, SEXP sFUN, SEXP rho, SEXP sDots) {
-    SEXP head = R_NilValue, tail = R_NilValue, elt, cache, c_tail;
-    long in_cache = 0;
-    int pc = 1;
-    c_tail = cache = PROTECT(CONS(R_NilValue, R_NilValue));
+    SEXP head = R_NilValue, tail = R_NilValue, elt;
+    char sep = 0;
+    const char *last_key_line = 0;
+    int key_len = 0;
+    if (TYPEOF(sSep) == STRSXP) {
+	const char *seps;
+	if (LENGTH(sSep) < 1) Rf_error("Invalid key separator");
+	seps = CHAR(STRING_ELT(sSep, 0));
+	sep = *seps;
+	if (seps[1])
+	    Rf_warning("only single-byte key separators are supported, ignoring trailing bytes");
+	if (chunk_reader_keysep(sReader) != sep)
+	    Rf_error("the chunk.tapply separator and chunk.reader separator do not match - do not set chunk.tapply(sep=) when using an existing reader");
+    } else {
+	sep = chunk_reader_keysep(sReader);
+	if (sSep != R_NilValue)
+	    Rf_error("Invalid key separator");
+    }
     while (1) {
+	const char *lg, *cl, *el;
 	PROTECT(elt = chunk_read(sReader, sMaxSize, R_NilValue));
+#ifdef IOTOOLS_DEBUG
+	Rprintf("=== chunk read: %d bytes\n", (int) LENGTH(elt));
+#endif
 	if (LENGTH(elt) == 0) { /* EOF */
-	    if (CAR(cache) == R_NilValue) { /* any cache left? */
-		UNPROTECT(1);
-		break; /* no? outa here ... */
-	    } else { /* replace elt with the content of the cache */
-		UNPROTECT(1);
-		{ /* copy all cache into a new vector */
-		    char *ptr = (char*) RAW(PROTECT(elt = allocVector(RAWSXP, in_cache)));
-		    SEXP w = cache;
-		    while (w != R_NilValue) {
-			memcpy(ptr, RAW(CAR(w)), LENGTH(CAR(w)));
-			ptr += LENGTH(CAR(w));
-			w = CDR(w);
+#ifdef IOTOOLS_DEBUG
+	    Rprintf(" - EOF\n");
+#endif
+	    UNPROTECT(1);
+	    break;
+	}
+
+	lg /* last group */ = cl /* current line */ = (const char*) RAW(elt);
+	el /* end line */   = cl + LENGTH(elt);
+	while (el >= cl) { /* anything new? */
+	    int is_complete = 0;
+	    const char *seploc = 0;
+	    const char *nlloc = 0;
+	    if (el == cl) { /* end of input which must be a group since we use key-aware reader */
+		is_complete = 1;
+	    } else {
+		/* actual new content */
+		seploc = (const char*) memchr(cl, (int) sep, el - cl);
+		nlloc  = (const char*) memchr(cl, (int) '\n', el - cl);
+		if (!seploc)
+		    seploc = nlloc;
+		if (!nlloc) { /* no nl -> should never happen except at EOF with missing final \n */
+		    nlloc = el;
+		    break; /* next read */
+		}
+		if (!last_key_line) { /* no key yet, set it */
+		    last_key_line = cl;
+		    key_len = seploc - cl;
+#ifdef IOTOOLS_DEBUG
+		    *((char*)seploc) = 0;
+		    Rprintf("brand new key [%s]\n", last_key_line);
+		    *((char*)seploc) = sep;
+#endif
+		    continue;
+		} else if (key_len != (seploc - cl) || memcmp(cl, last_key_line, key_len)) { /* cl is new group */
+#ifdef IOTOOLS_DEBUG
+		    *((char*)seploc) = 0;
+		    Rprintf("mismatching key [%s], constructing call for last key\n", cl);
+		    *((char*)seploc) = sep;
+#endif
+		    is_complete = 1;
+		}
+	    }
+	    if (is_complete) {
+		/* have to construct the contents */
+		int alen = (int) (cl - lg);
+#ifdef IOTOOLS_DEBUG
+		Rprintf(" - this length = %d\n", alen);
+#endif
+		if (alen) {
+		    SEXP nval = PROTECT(Rf_allocVector(RAWSXP, alen));
+		    memcpy(RAW(nval), lg, LENGTH(nval));
+		    { /* call the group */
+			SEXP val = eval(PROTECT(LCONS(sFUN, CONS(nval, sDots))), rho);
+			UNPROTECT(2); /* eval + nval */
+			PROTECT(val);
+			if (sMerge != R_NilValue) {
+			    if (head == R_NilValue) {
+				tail = head = CONS(val, R_NilValue);
+				R_PreserveObject(head);
+			    } else
+				tail = SETCDR(tail, CONS(val, R_NilValue));
+			}
+			UNPROTECT(1); /* val */
 		    }
 		}
-		/* empty cache */
-		in_cache = 0;
-		SETCDR(cache, R_NilValue);
-		SETCAR(cache, R_NilValue);
-		c_tail = cache;
-	    }
-	} else {
-	    SEXP sHold = last_key_back(elt, sSep);
-	    int hold = INTEGER(sHold)[0];
-#if CHUNK_DEBUG
-	    Rprintf("hold %d of %d (in-cache=%ld)\n", hold, LENGTH(elt), in_cache);
-	    {
-		char tmp[128], *tc = tmp;
-		memcpy(tmp, RAW(elt) + hold - 16, 32);
-		while (*tc) { if (*tc == '\n') *tc = '#'; tc++; }
-		tmp[32] = 0;
-		Rprintf("   [%s]\n", tmp);
-		Rprintf("                    ^\n");
-	    }
-#endif
-	    if (!hold) { /* all the same key -- append to cache */
-#if CHUNK_DEBUG
-		Rprintf(" - single key chunk\n");
-#endif
-		c_tail = SETCDR(c_tail, CONS(elt, R_NilValue));
-		in_cache += LENGTH(elt);
-		UNPROTECT(1); /* elt */
-		continue; /* and skip the eval step */
-	    }
-
-	    if (CAR(cache) != R_NilValue) { /* anything to merge with ? */
-		SEXP nv, w = cache;
-		char *ptr;
-#if CHUNK_DEBUG
-		int total = 0, cid = 0;
-#endif
-		in_cache += hold; /* ok, have to alloc+copy, unfortunately */
-		ptr = (char*) RAW(PROTECT(nv = allocVector(RAWSXP, in_cache)));
-		while (w != R_NilValue) {
-#if CHUNK_DEBUG
-		    Rprintf(" - copying from cache #%d, %d (total %d)\n",
-			    ++cid, LENGTH(CAR(w)), total += LENGTH(CAR(w)));
-#endif
-		    memcpy(ptr, RAW(CAR(w)), LENGTH(CAR(w)));
-		    ptr += LENGTH(CAR(w));
-		    w = CDR(w);
+		/* start a new group (only if it's not the last one) */
+		if (seploc) {
+		    lg = cl;
+		    last_key_line = cl;
+		    key_len = seploc - cl;
 		}
-		memcpy(ptr, RAW(elt), hold);
-		w = PROTECT(allocVector(RAWSXP, LENGTH(elt) - hold));
-		memcpy(RAW(w), RAW(elt) + hold, LENGTH(elt) - hold);
-		SETCAR(cache, w);
-		SETCDR(cache, R_NilValue);
-		c_tail = cache;
-		in_cache = LENGTH(w);
-		UNPROTECT(3); /* elt, nv, w */
-		elt = nv;
-		PROTECT(elt);
-	    } else { /* no cache - create one */
-		SEXP nv = PROTECT(allocVector(RAWSXP, LENGTH(elt) - hold));
-		memcpy(RAW(nv), RAW(elt) + hold, LENGTH(elt) - hold);
-		SETCAR(cache, nv);
-		SETCDR(cache, R_NilValue);
-		/* we can do in-place shortening */
-		SETLENGTH(elt, hold);
-		c_tail = cache;
-		in_cache = LENGTH(nv);
-		UNPROTECT(1);
+	    } else if (el > cl) { /* same group, matching key */
+		/* assuming it is more efficient to compare to memory close by */
+		last_key_line = cl;
 	    }
+	    if (el > cl) {
+		cl = nlloc;
+		while (*cl == '\n' && cl < el) /* eat up trailing \n */
+		    cl++;
+	    } else break;
 	}
-
-	{
-	    SEXP val = eval(PROTECT(LCONS(sFUN, CONS(elt, sDots))), rho);
-	    UNPROTECT(2); /* eval + elt */
-	    if (sMerge != R_NilValue) {
-		if (head == R_NilValue) {
-		    tail = head = PROTECT(CONS(val, R_NilValue));
-		    pc++;
-		} else
-		    tail = SETCDR(tail, CONS(val, R_NilValue));
-	    }
-	}
+	UNPROTECT(1); /* elt */
     }
     if (sMerge != R_NilValue) {
-	head = eval(PROTECT(LCONS(sMerge, head)), rho);
-	pc++;
-    }
-    UNPROTECT(pc);
+	SEXP e = PROTECT(LCONS(sMerge, head));
+	if (head != R_NilValue)
+	    R_ReleaseObject(head);
+	head = eval(e, rho);
+	UNPROTECT(1);
+    } else if (head != R_NilValue)
+	R_ReleaseObject(head);
     return head;
 }
 
