@@ -5,13 +5,14 @@ loading (non-binary) data to R. This package started as an attempt to
 provide high-performance parsing tools that minimize copying and avoid
 the use of strings when possible (see
 [mstrsplit](https://rforge.net/doc/packages/iotools/mstrsplit.html),
-for example).
+for example). A paper describing the some functionality of the package can be
+found [here](https://doi.org/10.32614/RJ-2017-001)
 
 To allow processing of arbitrarily large files we have added way to
 process chunk-wise input, making it possible to compute on streaming
 input as well as very large files (see
-[chunk.reader](https://rforge.net/doc/packages/iotools/chunk.html) and
-[chunk.apply](https://rforge.net/doc/packages/iotools/chunk.apply.html)).
+[chunk.reader](https://rforge.net/iotools/docs/reference/chunk.html) and
+[chunk.apply](https://rforge.net/iotools/docs/reference/chunk.apply.html)).
 
 The next natural progress was to wrap support for Hadoop
 streaming. The major goal was to make it possible to compute using
