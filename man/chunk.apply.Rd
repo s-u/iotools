@@ -97,6 +97,13 @@ res}
   \code{FUN} should be considered independent. However, \code{CH.MERGE}
   is always run in the current session and thus is allowed to have
   side-effects.
+
+  \code{chunk.tapply} requires that the input is sharded by key, i.e.
+  records with the same key must be adjacent (similar to
+  \code{\link{ctapply}}). The function \code{FUN} is then guaranteed to
+  be called for all values of exactly one key at a time (unlike
+  \code{\link{chunk.apply}} which always processes the entire chunk
+  which may contain multiple keys).
 }
 %\references{
 %}
