@@ -6,6 +6,8 @@
     *	The implementation now works both with and without growabale
 	vector API and across a wide range of R versions.
 
+    *	remove superfluous rawToChar() on column names (#38)
+
 
 0.3-5	2023-11-29
     *	add format casts

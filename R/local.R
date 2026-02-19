@@ -137,7 +137,7 @@ write.csv.raw = function(x, file = "", append = FALSE, sep = ",", nsep="\t",
   }
 
   if (col.names) {
-    cr = rawToChar(as.output(matrix(colnames(x),nrow=1),sep = sep))
+    cr = as.output(matrix(colnames(x),nrow=1),sep = sep)
     writeBin(cr, con=file)
   }
 
